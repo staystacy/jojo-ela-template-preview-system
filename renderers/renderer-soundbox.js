@@ -10,8 +10,11 @@ window.JOJO_RENDERERS['T-SOUNDBOX'] = function (data, container) {
 
   var cellSize = data.cell_size || 48;
   var items = data.items || [];
+
+  // Horizontal rows layout - each row fills the width
   var list = document.createElement('div');
   list.className = 'ws-items-list';
+  list.style.gap = '12px';
 
   items.forEach(function (item, i) {
     var row = R.itemRow();
@@ -21,7 +24,7 @@ window.JOJO_RENDERERS['T-SOUNDBOX'] = function (data, container) {
 
     // Image
     if (item.image) {
-      var img = R.imagePlaceholder(item.image, 60, 60);
+      var img = R.imagePlaceholder(item.image, 56, 56);
       R.annotate(img, 'items[' + i + '].image');
       row.appendChild(img);
     }
@@ -33,13 +36,12 @@ window.JOJO_RENDERERS['T-SOUNDBOX'] = function (data, container) {
       row.appendChild(audio);
     }
 
-    // Sound boxes
+    // Sound boxes - connected group with shared background
     var boxes = item.boxes || 3;
     var prefill = item.prefill || [];
     var phonemes = item.phonemes || [];
-    var boxContainer = document.createElement('div');
-    boxContainer.style.display = 'flex';
-    boxContainer.style.gap = '4px';
+    var boxGroup = document.createElement('div');
+    boxGroup.className = 'ws-soundbox-group';
 
     for (var b = 0; b < boxes; b++) {
       var content = prefill[b] || '';
@@ -47,10 +49,10 @@ window.JOJO_RENDERERS['T-SOUNDBOX'] = function (data, container) {
       var displayContent = prefill[b] || phonemes[b] || '';
       var cell = R.writingCell(cellSize, scaffold, displayContent);
       R.annotate(cell, 'items[' + i + '].phonemes[' + b + ']');
-      boxContainer.appendChild(cell);
+      boxGroup.appendChild(cell);
     }
 
-    row.appendChild(boxContainer);
+    row.appendChild(boxGroup);
     R.annotate(row, 'items[' + i + ']');
     list.appendChild(row);
   });
