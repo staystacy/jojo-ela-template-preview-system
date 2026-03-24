@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JOJO ELA Template Preview v2</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Andika&family=Fira+Code:wght@400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header id="app-header">
+    <div class="header-left">
+      <span class="header-logo">JOJO ELA</span>
+      <span class="header-title">Template Preview</span>
+    </div>
+    <div class="header-right">
+      <span class="header-version">v2</span>
+      <span class="header-date">2026-03-24</span>
+    </div>
+  </header>
+
+  <div id="app-body">
+    <aside id="sidebar">
+      <div class="sidebar-header">Templates</div>
+      <nav id="template-list"></nav>
+    </aside>
+
+    <main id="main-area">
+      <div id="worksheet-container">
+        <div id="worksheet">
+          <div id="worksheet-empty">
+            <p>Select a template from the left panel</p>
+          </div>
+        </div>
+      </div>
+
+      <div id="controls">
+        <div class="control-group">
+          <label class="control-label">Variant</label>
+          <div id="variant-buttons" class="button-row"></div>
+        </div>
+        <div class="control-group">
+          <label class="control-label">Grade</label>
+          <div id="grade-buttons" class="button-row"></div>
+        </div>
+        <div class="control-group control-group-inline">
+          <label class="annotation-toggle">
+            <input type="checkbox" id="annotation-checkbox">
+            <span>Show Field Annotations</span>
+          </label>
+        </div>
+      </div>
+
+      <div id="json-panel">
+        <button id="json-toggle" class="json-toggle-btn">
+          <span class="json-toggle-icon">&#9654;</span>
+          JSON Data
+        </button>
+        <div id="json-content" class="json-content hidden">
+          <pre id="json-pre"><code id="json-code"></code></pre>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Data -->
+  <script src="data/template-registry.js"></script>
+  <script src="data/data-trace.js"></script>
+  <script src="data/data-write.js"></script>
+  <script src="data/data-soundbox.js"></script>
+  <script src="data/data-blend.js"></script>
+  <script src="data/data-circle.js"></script>
+  <script src="data/data-match.js"></script>
+  <script src="data/data-sort.js"></script>
+  <script src="data/data-fillin.js"></script>
+  <script src="data/data-listen.js"></script>
+  <script src="data/data-findword.js"></script>
+  <script src="data/data-ladder.js"></script>
+  <script src="data/data-passage.js"></script>
+  <script src="data/data-sequence.js"></script>
+  <script src="data/data-sentence.js"></script>
+  <script src="data/data-fixup.js"></script>
+  <script src="data/data-transform.js"></script>
+
+  <!-- Renderers -->
+  <script src="renderers/renderer-base.js"></script>
+  <script src="renderers/renderer-trace.js"></script>
+  <script src="renderers/renderer-write.js"></script>
+  <script src="renderers/renderer-soundbox.js"></script>
+  <script src="renderers/renderer-blend.js"></script>
+  <script src="renderers/renderer-circle.js"></script>
+  <script src="renderers/renderer-match.js"></script>
+  <script src="renderers/renderer-sort.js"></script>
+  <script src="renderers/renderer-fillin.js"></script>
+  <script src="renderers/renderer-listen.js"></script>
+  <script src="renderers/renderer-findword.js"></script>
+  <script src="renderers/renderer-ladder.js"></script>
+  <script src="renderers/renderer-passage.js"></script>
+  <script src="renderers/renderer-sequence.js"></script>
+  <script src="renderers/renderer-sentence.js"></script>
+  <script src="renderers/renderer-fixup.js"></script>
+  <script src="renderers/renderer-transform.js"></script>
+
+  <!-- App -->
+  <script src="app.js"></script>
+</body>
+</html>
