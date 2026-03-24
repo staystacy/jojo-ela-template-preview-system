@@ -16,24 +16,31 @@ window.JOJO_RENDERERS['T-CIRCLE'] = function (data, container) {
 
   // Grid mode (v1, v2, v3, v5)
   var options = data.options || [];
-  var grid = document.createElement('div');
-  grid.className = 'ws-options-grid';
 
-  // Relative position for SVG overlay
-  grid.style.position = 'relative';
+  // Determine grid columns based on option count
+  var cols = 4;
+  if (options.length <= 4) cols = 2;
+  else if (options.length <= 6) cols = 3;
+
+  var grid = document.createElement('div');
+  grid.className = 'ws-layout-b';
+
+  var gridArea = document.createElement('div');
+  gridArea.className = 'ws-grid-area';
+  gridArea.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
+  gridArea.style.gap = '16px';
+  gridArea.style.position = 'relative';
 
   options.forEach(function (opt, i) {
-    var cardWidth = opt.type === 'image' ? 130 : 120;
-    var card;
+    var card = document.createElement('div');
+    card.className = 'ws-option-card';
+    card.style.width = '100%';
+    card.style.minHeight = '80px';
 
     if (opt.type === 'image') {
-      card = document.createElement('div');
-      card.className = 'ws-option-card';
-      card.style.width = cardWidth + 'px';
       var img = R.imagePlaceholder(opt.content, 80, 60);
       card.appendChild(img);
 
-      // If there's also text (v2)
       if (opt.label) {
         var label = document.createElement('span');
         label.className = 'ws-option-card-text';
@@ -52,11 +59,6 @@ window.JOJO_RENDERERS['T-CIRCLE'] = function (data, container) {
         card.appendChild(audioBtn);
       }
     } else {
-      // Text option
-      card = document.createElement('div');
-      card.className = 'ws-option-card';
-      card.style.width = cardWidth + 'px';
-      card.style.minHeight = '48px';
       var text = document.createElement('span');
       text.className = 'ws-option-card-text';
       text.textContent = opt.content;
@@ -66,16 +68,17 @@ window.JOJO_RENDERERS['T-CIRCLE'] = function (data, container) {
     card.id = 'circle-opt-' + i;
     card.dataset.correct = opt.correct ? 'true' : 'false';
     R.annotate(card, 'options[' + i + ']');
-    grid.appendChild(card);
+    gridArea.appendChild(card);
   });
 
+  grid.appendChild(gridArea);
   container.appendChild(grid);
 
   // Draw hand-drawn circles on correct answers after layout
   requestAnimationFrame(function () {
     var svg = R.svgOverlay();
-    grid.appendChild(svg);
-    var gridRect = grid.getBoundingClientRect();
+    gridArea.appendChild(svg);
+    var gridRect = gridArea.getBoundingClientRect();
 
     options.forEach(function (opt, i) {
       if (!opt.correct) return;
@@ -96,11 +99,9 @@ function renderParagraphMode(data, container, R) {
   para.className = 'ws-passage';
   para.style.position = 'relative';
 
-  // Split text and wrap target words
   var text = data.paragraph;
   var targets = data.target_words || [];
 
-  // Build regex for targets
   var escaped = targets.map(function (w) {
     return w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   });
@@ -114,7 +115,6 @@ function renderParagraphMode(data, container, R) {
   R.annotate(para, 'paragraph');
   container.appendChild(para);
 
-  // Draw circles on target words
   requestAnimationFrame(function () {
     var svg = R.svgOverlay();
     para.appendChild(svg);

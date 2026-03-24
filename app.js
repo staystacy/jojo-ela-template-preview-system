@@ -11,12 +11,170 @@
     annotationsOn: false
   };
 
+  // ========== Interaction Guide Data ==========
+  var INTERACTION_GUIDES = {
+    'T-TRACE': {
+      actions: [
+        { icon: '\u270F\uFE0F', label: 'Handwrite: Trace letters/words along guide lines' }
+      ],
+      flow: 'Watch demo area \u2192 Tap \uD83D\uDD0A to hear pronunciation \u2192 Trace along dotted lines \u2192 Progress from guided to independent writing',
+      workbooks: 'PK-1, K-5, G1-4',
+      itemCount: '6\u20138 cells per page',
+      estimatedTime: '2\u20133 minutes'
+    },
+    'T-WRITE': {
+      actions: [
+        { icon: '\u270F\uFE0F', label: 'Handwrite: Write letters or words in cells' },
+        { icon: '\uD83D\uDD0A', label: 'Audio: Listen to word pronunciation' }
+      ],
+      flow: 'See picture / hear sound \u2192 Identify the word \u2192 Write the letter or word in the blank cells',
+      workbooks: 'PK-1, K-2, K-9, G1-4',
+      itemCount: '5\u20136 items per page',
+      estimatedTime: '2\u20133 minutes'
+    },
+    'T-SOUNDBOX': {
+      actions: [
+        { icon: '\u270F\uFE0F', label: 'Handwrite: Fill in phoneme letters' },
+        { icon: '\uD83D\uDD0A', label: 'Audio: Listen to full word' }
+      ],
+      flow: 'See picture \u2192 Tap \uD83D\uDD0A to hear full word \u2192 Segment each sound \u2192 Write one letter per box',
+      workbooks: 'K-2, K-9, G1-2',
+      itemCount: '5\u20136 items per page',
+      estimatedTime: '3\u20134 minutes'
+    },
+    'T-BLEND': {
+      actions: [
+        { icon: '\u270F\uFE0F', label: 'Handwrite: Write the blended word' },
+        { icon: '\uD83D\uDD0A', label: 'Audio: Listen to each phoneme' }
+      ],
+      flow: 'Tap each phoneme button to hear sounds \u2192 Blend sounds together \u2192 Write the complete word',
+      workbooks: 'PK-1, K-2, G1-2',
+      itemCount: '4\u20136 items per page',
+      estimatedTime: '3\u20134 minutes'
+    },
+    'T-CIRCLE': {
+      actions: [
+        { icon: '\u2B55', label: 'Circle: Draw a circle around the correct answer' },
+        { icon: '\uD83D\uDD0A', label: 'Audio: Listen to instruction (optional)' }
+      ],
+      flow: 'Read/hear the instruction \u2192 Look at all options \u2192 Circle the correct answer with Apple Pencil',
+      workbooks: 'PK-1, K-2, K-5, G1-4, G2-3',
+      itemCount: '4\u20138 options per page',
+      estimatedTime: '1\u20132 minutes'
+    },
+    'T-MATCH': {
+      actions: [
+        { icon: '\u270F\uFE0F', label: 'Draw lines: Connect matching pairs' },
+        { icon: '\uD83D\uDD0A', label: 'Audio: Listen to items (optional)' }
+      ],
+      flow: 'Read left column items \u2192 Find matching item in right column \u2192 Draw a line to connect the pair',
+      workbooks: 'PK-1, K-2, K-5, G1-4',
+      itemCount: '3\u20135 pairs per page',
+      estimatedTime: '2\u20133 minutes'
+    },
+    'T-SORT': {
+      actions: [
+        { icon: '\uD83D\uDC46', label: 'Drag: Move cards into the correct category' }
+      ],
+      flow: 'Read category labels on buckets \u2192 Look at each card \u2192 Drag card to the correct bucket',
+      workbooks: 'K-2, G1-2, G2-3',
+      itemCount: '6\u20138 cards, 2\u20133 buckets',
+      estimatedTime: '2\u20133 minutes'
+    },
+    'T-FILLIN': {
+      actions: [
+        { icon: '\u270F\uFE0F', label: 'Handwrite: Fill in missing letters or words' }
+      ],
+      flow: 'See picture / read sentence \u2192 Identify missing part \u2192 Write the answer in the blank',
+      workbooks: 'K-2, K-9, G1-4, G2-3',
+      itemCount: '5\u20136 items per page',
+      estimatedTime: '2\u20133 minutes'
+    },
+    'T-LISTEN': {
+      actions: [
+        { icon: '\u2B55', label: 'Circle: Select the correct picture/word' },
+        { icon: '\u270F\uFE0F', label: 'Handwrite: Write what you hear' },
+        { icon: '\uD83D\uDD0A', label: 'Audio: Listen to the sound/word/sentence' }
+      ],
+      flow: 'Tap \uD83D\uDD0A to hear audio \u2192 Circle the correct picture OR write the word you heard',
+      workbooks: 'PK-1, K-2, K-9, G1-2',
+      itemCount: '4\u20136 items per page',
+      estimatedTime: '2\u20133 minutes'
+    },
+    'T-FINDWORD': {
+      actions: [
+        { icon: '\u2B55', label: 'Circle: Find and circle all target words in the grid' }
+      ],
+      flow: 'Read the target word at top \u2192 Scan the letter grid \u2192 Circle every occurrence of the target word',
+      workbooks: 'K-9, G1-2, G2-3',
+      itemCount: '1\u20133 target words, 5\u00d75 or 6\u00d76 grid',
+      estimatedTime: '3\u20134 minutes'
+    },
+    'T-LADDER': {
+      actions: [
+        { icon: '\u270F\uFE0F', label: 'Handwrite: Build new words by changing first letter' }
+      ],
+      flow: 'Read the word family root \u2192 Look at the hint letter \u2192 Write the new word \u2192 Climb the ladder step by step',
+      workbooks: 'K-9, G1-2',
+      itemCount: '2 ladders, 4\u20135 rungs each',
+      estimatedTime: '3\u20134 minutes'
+    },
+    'T-PASSAGE': {
+      actions: [
+        { icon: '\u2B55', label: 'Circle: Choose correct answer' },
+        { icon: '\u2328\uFE0F', label: 'Type: Write answers to questions' }
+      ],
+      flow: 'Read the passage on the left \u2192 Answer questions on the right (circle or type)',
+      workbooks: 'K-9, G1-4, G2-3, G3-2',
+      itemCount: '1 passage + 3\u20135 questions',
+      estimatedTime: '4\u20136 minutes'
+    },
+    'T-SEQUENCE': {
+      actions: [
+        { icon: '\uD83D\uDC46', label: 'Drag: Arrange items in the correct order' }
+      ],
+      flow: 'Look at the scrambled cards \u2192 Determine correct order \u2192 Drag each card to the numbered slot',
+      workbooks: 'PK-1, K-2, G1-4, G2-3',
+      itemCount: '3\u20135 items to order',
+      estimatedTime: '2\u20133 minutes'
+    },
+    'T-SENTENCE': {
+      actions: [
+        { icon: '\u2328\uFE0F', label: 'Type: Write complete sentences' }
+      ],
+      flow: 'Look at the picture / read the prompt / use word bank \u2192 Type a complete sentence',
+      workbooks: 'K-9, G1-4, G2-3, G3-2',
+      itemCount: '1\u20133 prompts per page',
+      estimatedTime: '3\u20135 minutes'
+    },
+    'T-FIXUP': {
+      actions: [
+        { icon: '\u2B55', label: 'Circle: Mark errors in the sentence' },
+        { icon: '\u2328\uFE0F', label: 'Type: Rewrite the corrected sentence' }
+      ],
+      flow: 'Read the incorrect sentence \u2192 Find the error(s) \u2192 Type the corrected version below',
+      workbooks: 'G1-4, G2-3, G3-2',
+      itemCount: '3\u20134 sentences per page',
+      estimatedTime: '3\u20135 minutes'
+    },
+    'T-TRANSFORM': {
+      actions: [
+        { icon: '\u270F\uFE0F', label: 'Handwrite or Type: Apply the transformation rule' }
+      ],
+      flow: 'Read the original word/sentence \u2192 Apply the given rule \u2192 Write or type the transformed version',
+      workbooks: 'G1-4, G2-3, G3-2',
+      itemCount: '5\u20136 items per page',
+      estimatedTime: '3\u20134 minutes'
+    }
+  };
+
   // ========== DOM References ==========
   var templateListEl = document.getElementById('template-list');
   var worksheetEl = document.getElementById('worksheet');
   var variantBtnsEl = document.getElementById('variant-buttons');
   var gradeBtnsEl = document.getElementById('grade-buttons');
   var annotationCb = document.getElementById('annotation-checkbox');
+  var guideContainerEl = document.getElementById('interaction-guide-container');
   var jsonToggleBtn = document.getElementById('json-toggle');
   var jsonToggleIcon = jsonToggleBtn.querySelector('.json-toggle-icon');
   var jsonContentEl = document.getElementById('json-content');
@@ -193,11 +351,13 @@
         (state.templateId || '—') + ' / ' + (state.variant || '—') + ' / ' + (state.grade || '—') +
         '</p></div>';
       updateJsonPanel(null);
+      guideContainerEl.innerHTML = '';
       return;
     }
 
     renderer(data, worksheetEl);
     updateJsonPanel(data);
+    renderInteractionGuide();
   }
 
   function getPageData() {
@@ -205,6 +365,17 @@
     return d[state.templateId] &&
       d[state.templateId][state.variant] &&
       d[state.templateId][state.variant][state.grade] || null;
+  }
+
+  // ========== Interaction Guide ==========
+  function renderInteractionGuide() {
+    guideContainerEl.innerHTML = '';
+    var guideData = INTERACTION_GUIDES[state.templateId];
+    if (!guideData) return;
+    var R = window.JOJO_RENDER;
+    if (R && R.interactionGuide) {
+      guideContainerEl.appendChild(R.interactionGuide(guideData));
+    }
   }
 
   // ========== JSON Panel ==========

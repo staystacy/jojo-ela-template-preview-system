@@ -10,63 +10,56 @@ window.JOJO_RENDERERS['T-SEQUENCE'] = function (data, container) {
 
   var items = data.items || [];
   var displayOrder = data.display_order || items.map(function (_, i) { return i; });
+  var isTextMode = items[0] && items[0].type !== 'image';
 
-  // Show items in scrambled order at top
-  var scrambledTitle = R.sectionTitle('Arrange in order:');
-  container.appendChild(scrambledTitle);
+  // Pattern D layout
+  var layout = document.createElement('div');
+  layout.className = 'ws-layout-d';
 
-  var scrambled = document.createElement('div');
-  scrambled.style.display = 'flex';
-  scrambled.style.flexWrap = 'wrap';
-  scrambled.style.gap = '10px';
-  scrambled.style.marginBottom = '24px';
-  scrambled.style.justifyContent = 'center';
+  // Top: scrambled cards area
+  var cardsArea = document.createElement('div');
+  cardsArea.className = 'ws-cards-area';
 
   displayOrder.forEach(function (origIdx) {
     var item = items[origIdx] || items[0];
     var card = document.createElement('div');
-    card.className = 'ws-option-card';
-    card.style.width = 'auto';
-    card.style.maxWidth = '200px';
-    card.style.padding = '10px 16px';
+    card.className = 'ws-draggable-card';
+
+    if (isTextMode) {
+      card.style.maxWidth = '100%';
+      card.style.flex = '1 1 45%';
+    }
 
     if (item.type === 'image') {
+      card.classList.add('ws-card-image');
       card.appendChild(R.imagePlaceholder(item.content, 80, 60));
     } else {
       var text = document.createElement('span');
       text.style.fontFamily = '"Andika", "Comic Neue", sans-serif';
-      text.style.fontSize = '15px';
+      text.style.fontSize = '14px';
       text.style.color = 'var(--text-primary)';
       text.textContent = item.content;
       card.appendChild(text);
     }
 
-    scrambled.appendChild(card);
+    cardsArea.appendChild(card);
   });
 
-  container.appendChild(scrambled);
+  layout.appendChild(cardsArea);
 
-  // Arrow
-  var arrowDown = document.createElement('div');
-  arrowDown.style.textAlign = 'center';
-  arrowDown.style.fontSize = '20px';
-  arrowDown.style.color = 'var(--text-hint)';
-  arrowDown.style.marginBottom = '16px';
-  arrowDown.textContent = '\u25BC';
-  container.appendChild(arrowDown);
+  // Drag hint
+  var dragHint = document.createElement('div');
+  dragHint.className = 'ws-drag-hint';
+  dragHint.innerHTML = '<span class="ws-drag-arrow">\u25BC</span> Drag to arrange in order <span class="ws-drag-arrow">\u25BC</span>';
+  layout.appendChild(dragHint);
 
-  // Correct order slots
-  var correctTitle = R.sectionTitle('Correct order:');
-  container.appendChild(correctTitle);
+  // Bottom: numbered slots
+  var slotsArea = document.createElement('div');
+  slotsArea.className = 'ws-slots-area';
+  if (!isTextMode && items.length <= 4) {
+    slotsArea.classList.add('ws-slots-area-2col');
+  }
 
-  var slots = document.createElement('div');
-  slots.style.display = 'flex';
-  slots.style.flexDirection = 'column';
-  slots.style.gap = '8px';
-  slots.style.maxWidth = '500px';
-  slots.style.margin = '0 auto';
-
-  // Sort by order
   var sorted = items.slice().sort(function (a, b) { return a.order - b.order; });
 
   sorted.forEach(function (item, i) {
@@ -83,15 +76,16 @@ window.JOJO_RENDERERS['T-SEQUENCE'] = function (data, container) {
     } else {
       var text = document.createElement('span');
       text.style.fontFamily = '"Andika", "Comic Neue", sans-serif';
-      text.style.fontSize = '15px';
+      text.style.fontSize = '14px';
       text.style.color = 'var(--text-primary)';
       text.textContent = item.content;
       slot.appendChild(text);
     }
 
     R.annotate(slot, 'items[' + i + ']');
-    slots.appendChild(slot);
+    slotsArea.appendChild(slot);
   });
 
-  container.appendChild(slots);
+  layout.appendChild(slotsArea);
+  container.appendChild(layout);
 };

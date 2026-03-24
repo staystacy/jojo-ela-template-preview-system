@@ -10,53 +10,68 @@ window.JOJO_RENDERERS['T-LISTEN'] = function (data, container) {
 
   var cellSize = data.cell_size || 48;
   var items = data.items || [];
-  var list = document.createElement('div');
-  list.className = 'ws-items-list';
+
+  // Items in a grid layout
+  var grid = document.createElement('div');
+  grid.style.display = 'grid';
+  grid.style.gap = '16px';
+  // Use 2 columns for circle mode with few items, 1 column for write/type
+  var hasCircle = items[0] && items[0].response_type === 'circle';
+  grid.style.gridTemplateColumns = (hasCircle && items.length >= 4) ? 'repeat(2, 1fr)' : '1fr';
 
   items.forEach(function (item, i) {
-    var row = R.itemRow();
+    // Listen item card: audio button left + response area right
+    var card = document.createElement('div');
+    card.className = 'ws-listen-item';
 
-    // Item number
-    row.appendChild(R.itemNumber(i + 1));
+    // Left: item number + large audio button
+    var audioCol = document.createElement('div');
+    audioCol.className = 'ws-audio-col';
+    audioCol.appendChild(R.itemNumber(i + 1));
 
-    // Audio button
     if (item.audio) {
       var audio = R.audioButton(item.audio);
       R.annotate(audio, 'items[' + i + '].audio');
-      row.appendChild(audio);
+      audioCol.appendChild(audio);
     }
 
-    // Response area depends on response_type
+    card.appendChild(audioCol);
+
+    // Right: response area
+    var responseCol = document.createElement('div');
+    responseCol.className = 'ws-response-col';
+
     if (item.response_type === 'circle' && item.options) {
-      // Circle from options
+      // 2×2 grid of options
       var opts = document.createElement('div');
-      opts.style.display = 'flex';
-      opts.style.gap = '10px';
+      opts.style.display = 'grid';
+      opts.style.gridTemplateColumns = 'repeat(2, 1fr)';
+      opts.style.gap = '8px';
       opts.style.position = 'relative';
 
       item.options.forEach(function (opt, oi) {
-        var card;
+        var optCard;
         if (opt.content && opt.content.indexOf('.png') !== -1) {
-          card = document.createElement('div');
-          card.className = 'ws-option-card';
-          card.style.width = '80px';
-          card.appendChild(R.imagePlaceholder(opt.content, 56, 50));
+          optCard = document.createElement('div');
+          optCard.className = 'ws-option-card';
+          optCard.style.width = '100%';
+          optCard.appendChild(R.imagePlaceholder(opt.content, 48, 40));
         } else {
-          card = document.createElement('div');
-          card.className = 'ws-option-card';
-          card.style.width = '60px';
-          card.style.minHeight = '44px';
+          optCard = document.createElement('div');
+          optCard.className = 'ws-option-card';
+          optCard.style.width = '100%';
+          optCard.style.minHeight = '40px';
           var t = document.createElement('span');
           t.className = 'ws-option-card-text';
           t.textContent = opt.content;
-          card.appendChild(t);
+          optCard.appendChild(t);
         }
-        card.id = 'listen-' + i + '-opt-' + oi;
-        card.dataset.correct = opt.correct ? 'true' : 'false';
-        opts.appendChild(card);
+        optCard.id = 'listen-' + i + '-opt-' + oi;
+        optCard.dataset.correct = opt.correct ? 'true' : 'false';
+        opts.appendChild(optCard);
       });
 
-      row.appendChild(opts);
+      responseCol.appendChild(opts);
 
       // Draw circle on correct after layout
       (function (itemIdx, optionsEl, optsList) {
@@ -79,21 +94,23 @@ window.JOJO_RENDERERS['T-LISTEN'] = function (data, container) {
       })(i, opts, item.options);
 
     } else if (item.response_type === 'write') {
-      // Handwriting cells
+      var cellGroup = document.createElement('div');
+      cellGroup.className = 'ws-soundbox-group';
       var answer = item.answer || '';
       answer.split('').forEach(function (ch) {
-        row.appendChild(R.writingCell(cellSize, 'answer', ch));
+        cellGroup.appendChild(R.writingCell(cellSize, 'answer', ch));
       });
+      responseCol.appendChild(cellGroup);
+
     } else if (item.response_type === 'type') {
-      // Typing area
-      var typing = R.typingArea(1, 'Type what you hear...', item.answer);
-      typing.style.flex = '1';
-      row.appendChild(typing);
+      var typing = R.typingArea(2, 'Type what you hear...', item.answer);
+      responseCol.appendChild(typing);
     }
 
-    R.annotate(row, 'items[' + i + ']');
-    list.appendChild(row);
+    card.appendChild(responseCol);
+    R.annotate(card, 'items[' + i + ']');
+    grid.appendChild(card);
   });
 
-  container.appendChild(list);
+  container.appendChild(grid);
 };

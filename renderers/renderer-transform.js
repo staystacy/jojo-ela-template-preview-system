@@ -10,18 +10,26 @@ window.JOJO_RENDERERS['T-TRANSFORM'] = function (data, container) {
 
   var cellSize = data.cell_size || 48;
   var items = data.items || [];
-  var list = document.createElement('div');
-  list.className = 'ws-items-list';
+
+  // Determine if sentence mode (type) or word mode (write)
+  var isSentenceMode = items[0] && items[0].input_type === 'type';
+
+  // Grid: 2 columns for word mode, 1 column for sentence mode
+  var grid = document.createElement('div');
+  grid.style.display = 'grid';
+  grid.style.gap = '14px';
+  grid.style.gridTemplateColumns = isSentenceMode ? '1fr' : 'repeat(2, 1fr)';
 
   items.forEach(function (item, i) {
     var row = R.itemRow();
+    row.style.flexWrap = 'nowrap';
 
     // Item number
     row.appendChild(R.itemNumber(i + 1));
 
     // Image (optional)
     if (item.image) {
-      var img = R.imagePlaceholder(item.image, 50, 50);
+      var img = R.imagePlaceholder(item.image, 44, 44);
       R.annotate(img, 'items[' + i + '].image');
       row.appendChild(img);
     }
@@ -29,13 +37,14 @@ window.JOJO_RENDERERS['T-TRANSFORM'] = function (data, container) {
     // Original word/sentence
     var original = document.createElement('span');
     original.style.fontFamily = '"Andika", "Comic Neue", sans-serif';
-    original.style.fontSize = item.input_type === 'type' ? '16px' : '22px';
+    original.style.fontSize = isSentenceMode ? '14px' : '20px';
     original.style.fontWeight = '600';
-    original.style.padding = '6px 14px';
+    original.style.padding = '4px 12px';
     original.style.background = 'var(--card-bg)';
     original.style.border = '2px solid var(--card-border)';
     original.style.borderRadius = '10px';
     original.style.color = 'var(--text-primary)';
+    original.style.whiteSpace = 'nowrap';
     original.textContent = item.original;
     R.annotate(original, 'items[' + i + '].original');
     row.appendChild(original);
@@ -43,7 +52,7 @@ window.JOJO_RENDERERS['T-TRANSFORM'] = function (data, container) {
     // Rule indicator
     if (item.rule) {
       var rule = document.createElement('span');
-      rule.style.fontSize = '11px';
+      rule.style.fontSize = '10px';
       rule.style.color = 'var(--text-hint)';
       rule.style.fontFamily = '"Fira Code", monospace';
       rule.textContent = item.rule;
@@ -55,23 +64,24 @@ window.JOJO_RENDERERS['T-TRANSFORM'] = function (data, container) {
 
     // Answer area
     if (item.input_type === 'type') {
-      // Typing for sentences
       var typing = R.typingArea(1, 'Type the transformed sentence...', item.answer);
       typing.style.flex = '1';
-      typing.style.minWidth = '200px';
+      typing.style.minWidth = '180px';
       R.annotate(typing, 'items[' + i + '].answer');
       row.appendChild(typing);
     } else {
-      // Handwriting cells for words
+      var cellGroup = document.createElement('div');
+      cellGroup.className = 'ws-soundbox-group';
       var answer = item.answer || '';
       answer.split('').forEach(function (ch) {
-        row.appendChild(R.writingCell(cellSize, 'answer', ch));
+        cellGroup.appendChild(R.writingCell(cellSize, 'answer', ch));
       });
+      row.appendChild(cellGroup);
     }
 
     R.annotate(row, 'items[' + i + ']');
-    list.appendChild(row);
+    grid.appendChild(row);
   });
 
-  container.appendChild(list);
+  container.appendChild(grid);
 };

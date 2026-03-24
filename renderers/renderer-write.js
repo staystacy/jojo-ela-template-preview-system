@@ -10,30 +10,41 @@ window.JOJO_RENDERERS['T-WRITE'] = function (data, container) {
 
   var cellSize = data.cell_size || 48;
   var items = data.items || [];
-  var list = document.createElement('div');
-  list.className = 'ws-items-list';
+
+  // 2-column grid layout for items
+  var grid = document.createElement('div');
+  grid.className = 'ws-content-grid-2col';
+  grid.style.display = 'grid';
+  grid.style.gridTemplateColumns = 'repeat(2, 1fr)';
+  grid.style.gap = '16px';
+
+  // For fewer items or longer answers, use single column
+  if (items.length <= 3 || (items[0] && items[0].answer && items[0].answer.length > 5)) {
+    grid.style.gridTemplateColumns = '1fr';
+  }
 
   items.forEach(function (item, i) {
     var row = R.itemRow();
+    row.style.flexWrap = 'nowrap';
 
     // Item number
     row.appendChild(R.itemNumber(i + 1));
 
-    // Image prompt
+    // Image prompt (left side, prominent)
     if (item.prompt_image) {
-      var img = R.imagePlaceholder(item.prompt_image, 64, 64);
+      var img = R.imagePlaceholder(item.prompt_image, 56, 56);
       R.annotate(img, 'items[' + i + '].prompt_image');
       row.appendChild(img);
     }
 
-    // Audio
+    // Audio button
     if (item.prompt_audio) {
       var audio = R.audioButton(item.prompt_audio);
       R.annotate(audio, 'items[' + i + '].prompt_audio');
       row.appendChild(audio);
     }
 
-    // Hint text
+    // Hint text (e.g., "_all" for v1 first-letter mode)
     if (item.hint) {
       var hint = document.createElement('span');
       hint.style.fontFamily = '"Andika", "Comic Neue", sans-serif';
@@ -44,18 +55,21 @@ window.JOJO_RENDERERS['T-WRITE'] = function (data, container) {
       row.appendChild(hint);
     }
 
-    // Writing cells for the answer
+    // Writing cells for the answer (largest, most prominent element)
     if (item.answer) {
+      var cellGroup = document.createElement('div');
+      cellGroup.className = 'ws-soundbox-group';
       var letters = item.answer.split('');
       letters.forEach(function (ch) {
         var cell = R.writingCell(cellSize, 'answer', ch);
-        row.appendChild(cell);
+        cellGroup.appendChild(cell);
       });
+      row.appendChild(cellGroup);
     }
 
     R.annotate(row, 'items[' + i + ']');
-    list.appendChild(row);
+    grid.appendChild(row);
   });
 
-  container.appendChild(list);
+  container.appendChild(grid);
 };
