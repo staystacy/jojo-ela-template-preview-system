@@ -16,71 +16,64 @@ window.JOJO_RENDERERS['T-PASSAGE'] = function (data, container) {
     return;
   }
 
-  // Standard layout: left passage, right questions
-  var twoCol = document.createElement('div');
-  twoCol.className = 'ws-two-col';
+  // Pattern C: left passage, right questions
+  var layout = document.createElement('div');
+  layout.className = 'ws-layout-c';
 
-  // Left: passage
-  var leftCol = document.createElement('div');
-  leftCol.className = 'ws-col';
-  leftCol.style.flex = '1.2';
+  // Left: passage column
+  var passageCol = document.createElement('div');
+  passageCol.className = 'ws-passage-col';
 
   if (data.passage) {
-    // Title
     if (data.passage.title) {
       var title = document.createElement('div');
       title.className = 'ws-passage-title';
       title.textContent = data.passage.title;
       R.annotate(title, 'passage.title');
-      leftCol.appendChild(title);
+      passageCol.appendChild(title);
     }
 
-    // Image
     if (data.passage.image) {
       var img = R.imagePlaceholder(data.passage.image, 200, 120);
       R.annotate(img, 'passage.image');
-      leftCol.appendChild(img);
+      passageCol.appendChild(img);
     }
 
-    // Text
     var passageText = document.createElement('div');
     passageText.className = 'ws-passage';
     passageText.textContent = data.passage.text;
     R.annotate(passageText, 'passage.text');
-    leftCol.appendChild(passageText);
+    passageCol.appendChild(passageText);
 
-    // Word count badge
     if (data.passage.word_count) {
       var badge = document.createElement('div');
       badge.style.fontSize = '11px';
       badge.style.color = 'var(--text-hint)';
       badge.style.marginTop = '8px';
       badge.textContent = data.passage.word_count + ' words \u00B7 ' + (data.passage.genre || 'fiction');
-      leftCol.appendChild(badge);
+      passageCol.appendChild(badge);
     }
 
     // Chart (v6)
     if (data.chart) {
-      renderChart(data.chart, leftCol, R);
+      renderChart(data.chart, passageCol, R);
     }
   }
 
-  twoCol.appendChild(leftCol);
+  layout.appendChild(passageCol);
 
-  // Right: questions
-  var rightCol = document.createElement('div');
-  rightCol.className = 'ws-col';
-  rightCol.style.flex = '1';
+  // Right: questions column
+  var questionsCol = document.createElement('div');
+  questionsCol.className = 'ws-questions-col';
 
   var qTitle = R.sectionTitle('Questions');
-  rightCol.appendChild(qTitle);
+  questionsCol.appendChild(qTitle);
 
   var questions = data.questions || [];
   questions.forEach(function (q, qi) {
     var qBlock = document.createElement('div');
     qBlock.className = 'ws-question';
 
-    // Question number + text
     var qHeader = document.createElement('div');
     qHeader.className = 'ws-question-text';
     qHeader.style.display = 'flex';
@@ -93,21 +86,21 @@ window.JOJO_RENDERERS['T-PASSAGE'] = function (data, container) {
     R.annotate(qHeader, 'questions[' + qi + '].question');
     qBlock.appendChild(qHeader);
 
-    // Response area
     if (q.response_type === 'circle' && q.options) {
-      // Circle options
+      // Circle options - horizontal layout
       var opts = document.createElement('div');
       opts.style.display = 'flex';
-      opts.style.flexDirection = 'column';
-      opts.style.gap = '6px';
+      opts.style.gap = '8px';
       opts.style.marginLeft = '36px';
+      opts.style.marginTop = '4px';
+      opts.style.flexWrap = 'wrap';
       opts.style.position = 'relative';
 
       q.options.forEach(function (opt, oi) {
         var optEl = document.createElement('div');
         optEl.style.fontFamily = '"Andika", "Comic Neue", sans-serif';
-        optEl.style.fontSize = '15px';
-        optEl.style.padding = '6px 12px';
+        optEl.style.fontSize = '14px';
+        optEl.style.padding = '4px 12px';
         optEl.style.background = 'var(--card-bg)';
         optEl.style.border = '1px solid var(--card-border)';
         optEl.style.borderRadius = '8px';
@@ -122,7 +115,6 @@ window.JOJO_RENDERERS['T-PASSAGE'] = function (data, container) {
 
       qBlock.appendChild(opts);
     } else if (q.response_type === 'type') {
-      // Typing response
       var typing = R.typingArea(q.answer_lines || 2, 'Type your answer...', q.answer);
       typing.style.marginLeft = '36px';
       R.annotate(typing, 'questions[' + qi + '].answer');
@@ -130,19 +122,25 @@ window.JOJO_RENDERERS['T-PASSAGE'] = function (data, container) {
     }
 
     R.annotate(qBlock, 'questions[' + qi + ']');
-    rightCol.appendChild(qBlock);
+    questionsCol.appendChild(qBlock);
   });
 
-  twoCol.appendChild(rightCol);
-  container.appendChild(twoCol);
+  layout.appendChild(questionsCol);
+  container.appendChild(layout);
 };
 
 function renderDualPassage(data, container, R) {
+  // Two passages stacked, then questions
+  var passagesArea = document.createElement('div');
+  passagesArea.style.display = 'flex';
+  passagesArea.style.gap = '16px';
+  passagesArea.style.marginBottom = '20px';
+
   var passages = data.passages || [];
 
   passages.forEach(function (p, pi) {
     var section = document.createElement('div');
-    section.style.marginBottom = '24px';
+    section.style.flex = '1';
     section.style.padding = '16px';
     section.style.background = pi === 0 ? 'var(--demo-bg)' : 'var(--card-bg)';
     section.style.borderRadius = '12px';
@@ -157,18 +155,26 @@ function renderDualPassage(data, container, R) {
 
     var text = document.createElement('div');
     text.className = 'ws-passage';
+    text.style.fontSize = '14px';
     text.textContent = p.text;
     section.appendChild(text);
 
     R.annotate(section, 'passages[' + pi + ']');
-    container.appendChild(section);
+    passagesArea.appendChild(section);
   });
 
-  // Questions
+  container.appendChild(passagesArea);
+
+  // Questions below
   var qTitle = R.sectionTitle('Questions');
   container.appendChild(qTitle);
 
   var questions = data.questions || [];
+  var qGrid = document.createElement('div');
+  qGrid.style.display = 'grid';
+  qGrid.style.gridTemplateColumns = 'repeat(2, 1fr)';
+  qGrid.style.gap = '12px';
+
   questions.forEach(function (q, qi) {
     var qBlock = document.createElement('div');
     qBlock.className = 'ws-question';
@@ -185,12 +191,13 @@ function renderDualPassage(data, container, R) {
     qBlock.appendChild(qHeader);
 
     var typing = R.typingArea(q.answer_lines || 2, 'Type your answer...', q.answer);
-    typing.style.marginLeft = '36px';
     qBlock.appendChild(typing);
 
     R.annotate(qBlock, 'questions[' + qi + ']');
-    container.appendChild(qBlock);
+    qGrid.appendChild(qBlock);
   });
+
+  container.appendChild(qGrid);
 }
 
 function renderChart(chart, parentEl, R) {
