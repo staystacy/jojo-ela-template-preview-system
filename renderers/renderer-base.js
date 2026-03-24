@@ -258,6 +258,60 @@ window.JOJO_RENDER = (function () {
     return el;
   }
 
+  // ========== Interaction Guide ==========
+  function interactionGuide(config) {
+    var el = document.createElement('div');
+    el.className = 'ws-interaction-guide';
+
+    var header = document.createElement('div');
+    header.className = 'ws-interaction-guide-header';
+    header.innerHTML = '<span>\u{1F4CB}</span> Interaction Guide';
+    el.appendChild(header);
+
+    // Actions
+    if (config.actions && config.actions.length) {
+      var actionsRow = document.createElement('div');
+      actionsRow.className = 'ws-interaction-guide-actions';
+      config.actions.forEach(function (a) {
+        var item = document.createElement('div');
+        item.className = 'ws-interaction-guide-action';
+        item.innerHTML = '<span class="action-icon">' + a.icon + '</span> ' + a.label;
+        actionsRow.appendChild(item);
+      });
+      el.appendChild(actionsRow);
+    }
+
+    // Flow
+    if (config.flow) {
+      var flow = document.createElement('div');
+      flow.className = 'ws-interaction-guide-flow';
+      flow.innerHTML = '<strong>Flow:</strong> ' + config.flow;
+      el.appendChild(flow);
+    }
+
+    // Meta row
+    var meta = document.createElement('div');
+    meta.className = 'ws-interaction-guide-meta';
+    if (config.workbooks) {
+      var wb = document.createElement('span');
+      wb.textContent = '\u{1F4D6} ' + config.workbooks;
+      meta.appendChild(wb);
+    }
+    if (config.itemCount) {
+      var ic = document.createElement('span');
+      ic.textContent = '\u{1F4DD} ' + config.itemCount;
+      meta.appendChild(ic);
+    }
+    if (config.estimatedTime) {
+      var et = document.createElement('span');
+      et.textContent = '\u{23F1}\uFE0F ' + config.estimatedTime;
+      meta.appendChild(et);
+    }
+    el.appendChild(meta);
+
+    return el;
+  }
+
   // ========== Public API ==========
   return {
     itemNumber: itemNumber,
@@ -278,6 +332,7 @@ window.JOJO_RENDER = (function () {
     seededRandom: seededRandom,
     wordBank: wordBank,
     sectionTitle: sectionTitle,
-    annotate: annotate
+    annotate: annotate,
+    interactionGuide: interactionGuide
   };
 })();

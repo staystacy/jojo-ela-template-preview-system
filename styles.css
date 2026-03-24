@@ -833,6 +833,276 @@ html, body {
   color: var(--text-primary);
 }
 
+/* ========== iPad Landscape Layout Patterns ========== */
+
+/* Pattern A: Left demo panel + Right content grid (T-TRACE, T-WRITE, T-SOUNDBOX, T-BLEND) */
+.ws-layout-a {
+  display: flex;
+  gap: 24px;
+  min-height: 480px;
+}
+
+.ws-layout-a .ws-demo-panel {
+  width: 200px;
+  min-width: 200px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  background: var(--demo-bg);
+  border-radius: 12px;
+  padding: 24px 16px;
+  text-align: center;
+}
+
+.ws-layout-a .ws-demo-panel .ws-demo-letter {
+  font-family: "Andika", "Comic Neue", sans-serif;
+  font-size: 80px;
+  font-weight: 400;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.ws-layout-a .ws-demo-panel .ws-demo-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ws-layout-a .ws-content-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  align-content: start;
+}
+
+.ws-layout-a .ws-content-grid-2col {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  align-content: start;
+}
+
+.ws-layout-a .ws-content-rows {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Pattern B: Instruction top + Multi-column grid (T-CIRCLE, T-MATCH, T-FILLIN, T-LISTEN) */
+.ws-layout-b .ws-grid-area {
+  display: grid;
+  gap: 16px;
+}
+
+.ws-layout-b .ws-grid-2x2 { grid-template-columns: repeat(2, 1fr); }
+.ws-layout-b .ws-grid-2x3 { grid-template-columns: repeat(3, 1fr); }
+.ws-layout-b .ws-grid-2x4 { grid-template-columns: repeat(4, 1fr); }
+.ws-layout-b .ws-grid-3col { grid-template-columns: repeat(3, 1fr); }
+
+/* Pattern C: Left text + Right answers (T-PASSAGE) — enhances existing .ws-two-col */
+.ws-layout-c {
+  display: flex;
+  gap: 24px;
+  min-height: 480px;
+}
+
+.ws-layout-c .ws-passage-col {
+  flex: 1.2;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ws-layout-c .ws-questions-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Pattern D: Top cards + Bottom buckets/slots (T-SORT, T-SEQUENCE) */
+.ws-layout-d .ws-cards-area {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+  margin-bottom: 16px;
+  padding: 16px;
+  background: #FAFAFA;
+  border-radius: 12px;
+  border: 1px dashed var(--cell-border);
+}
+
+.ws-layout-d .ws-drag-hint {
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-hint);
+  margin: 12px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.ws-layout-d .ws-drag-hint .ws-drag-arrow {
+  font-size: 20px;
+}
+
+.ws-layout-d .ws-buckets-area {
+  display: flex;
+  gap: 16px;
+}
+
+.ws-layout-d .ws-buckets-area .ws-bucket {
+  flex: 1;
+}
+
+.ws-layout-d .ws-slots-area {
+  display: grid;
+  gap: 10px;
+}
+
+.ws-layout-d .ws-slots-area-2col {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+/* Draggable card styling */
+.ws-draggable-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--card-bg);
+  border: 2px dashed var(--cell-border);
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-family: "Andika", "Comic Neue", sans-serif;
+  font-size: 16px;
+  color: var(--text-primary);
+  cursor: grab;
+  min-width: 80px;
+  text-align: center;
+}
+
+.ws-draggable-card.ws-card-image {
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+}
+
+/* Connected sound boxes group */
+.ws-soundbox-group {
+  display: flex;
+  gap: 2px;
+  background: #F0F7FA;
+  border-radius: 8px;
+  padding: 3px;
+}
+
+.ws-soundbox-group .ws-cell {
+  border-radius: 4px;
+}
+
+/* Listen item layout */
+.ws-listen-item {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  padding: 12px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+}
+
+.ws-listen-item .ws-audio-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding-top: 8px;
+}
+
+.ws-listen-item .ws-response-col {
+  flex: 1;
+}
+
+/* ========== Interaction Guide Panel ========== */
+.ws-interaction-guide {
+  width: 100%;
+  max-width: 960px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 16px 20px;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.ws-interaction-guide-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+
+.ws-interaction-guide-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.ws-interaction-guide-action {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  background: #F8F5EF;
+  border-radius: 8px;
+  padding: 4px 10px;
+}
+
+.ws-interaction-guide-action .action-icon {
+  font-size: 15px;
+}
+
+.ws-interaction-guide-flow {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+  line-height: 1.5;
+}
+
+.ws-interaction-guide-flow strong {
+  color: var(--text-primary);
+}
+
+.ws-interaction-guide-meta {
+  display: flex;
+  gap: 20px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.ws-interaction-guide-meta span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 /* Scrollbar styling */
 #sidebar::-webkit-scrollbar,
 .json-content::-webkit-scrollbar {
