@@ -10,28 +10,33 @@ window.JOJO_RENDERERS['T-MATCH'] = function (data, container) {
 
   var pairs = data.pairs || [];
 
-  // Create a relative container for SVG lines
+  // Three-zone layout: left 25% | center 50% (SVG lines) | right 25%
   var matchArea = document.createElement('div');
   matchArea.style.position = 'relative';
   matchArea.style.display = 'flex';
   matchArea.style.justifyContent = 'space-between';
-  matchArea.style.padding = '0 40px';
+  matchArea.style.alignItems = 'stretch';
+  matchArea.style.minHeight = (pairs.length * 80 + 40) + 'px';
+  matchArea.style.padding = '16px 0';
 
-  // Left column
+  // Left column (25%)
   var leftCol = document.createElement('div');
   leftCol.className = 'ws-col';
+  leftCol.style.flex = '0 0 25%';
   leftCol.style.alignItems = 'flex-end';
+  leftCol.style.justifyContent = 'space-around';
   leftCol.style.gap = '20px';
 
-  // Right column
+  // Right column (25%)
   var rightCol = document.createElement('div');
   rightCol.className = 'ws-col';
+  rightCol.style.flex = '0 0 25%';
   rightCol.style.alignItems = 'flex-start';
+  rightCol.style.justifyContent = 'space-around';
   rightCol.style.gap = '20px';
 
   // Shuffle right side for display
   var rightOrder = pairs.map(function (_, i) { return i; });
-  // Simple deterministic shuffle
   var rng = R.seededRandom(42);
   for (var i = rightOrder.length - 1; i > 0; i--) {
     var j = Math.floor(rng() * (i + 1));
@@ -41,7 +46,6 @@ window.JOJO_RENDERERS['T-MATCH'] = function (data, container) {
   }
 
   pairs.forEach(function (pair, i) {
-    // Left item
     var leftItem = document.createElement('div');
     leftItem.style.display = 'flex';
     leftItem.style.alignItems = 'center';
@@ -104,7 +108,6 @@ window.JOJO_RENDERERS['T-MATCH'] = function (data, container) {
   requestAnimationFrame(function () {
     var svg = R.svgOverlay();
     matchArea.appendChild(svg);
-
     var areaRect = matchArea.getBoundingClientRect();
 
     pairs.forEach(function (pair, i) {
