@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Bitable mode translator tests</title>
+  <style>
+    body { font-family: system-ui, sans-serif; padding: 20px; max-width: 900px; margin: 0 auto; }
+    h1 { color: #333; }
+    .stats { margin-bottom: 16px; padding: 12px; background: #f0f0f0; border-radius: 6px; }
+    ul { list-style: none; padding: 0; }
+    li { padding: 8px 12px; margin-bottom: 4px; border-radius: 4px; font-family: "Fira Code", monospace; font-size: 13px; }
+    li.pass { background: #d4edda; color: #155724; }
+    li.fail { background: #f8d7da; color: #721c24; }
+    li pre { margin-top: 8px; font-size: 11px; }
+  </style>
+</head>
+<body>
+  <h1>Bitable Mode Translator — K-1_U01 fixtures</h1>
+  <div class="stats" id="stats">Running...</div>
+  <ul id="results"></ul>
+
+  <script src="../renderers/renderer-base.js"></script>
+  <script src="bitable-mode.js"></script>
+  <script>
+  /* eslint-disable */
+
+  // ============ Fixtures (extracted from real Bitable K-1_U01 generator_output) ============
+
+  const PAGES = {
+    p1: {
+      pageId: "auto", pageNumber: 1, planPageNumber: 1,
+      stageName: "EnglishStage1",
+      instructionId: "instr_listen_word_soundbox",
+      instructionText: "Listen to the word. Write each sound in a box.",
+      englishLetterTopicList: [
+        { topicId:1, topicNumber:1, topicType:"english_sound_box_full",
+          word:"cat", answer:["c","a","t"],
+          source_trace:"content_pool.decodable_words[0]" },
+        { topicId:2, topicNumber:2, topicType:"english_sound_box_full",
+          word:"hat", answer:["h","a","t"],
+          source_trace:"content_pool.decodable_words[1]" },
+        { topicId:3, topicNumber:3, topicType:"english_sound_box_full",
+          word:"bat", answer:["b","a","t"],
+          source_trace:"content_pool.decodable_words[3]" },
+        { topicId:4, topicNumber:4, topicType:"english_sound_box_full",
+          word:"mat", answer:["m","a","t"],
+          source_trace:"content_pool.decodable_words[4]" }
+      ]
+    },
+    p2: {
+      pageNumber: 2, instructionId:"instr_look_picture_spell_word",
+      instructionText:"Look at the picture. Write the word.",
+      englishLetterTopicList: [
+        { topicType:"english_picture_spelling", word:"fan", answer:"fan", source_trace:"content_pool.decodable_words[2]" },
+        { topicType:"english_picture_spelling", word:"van", answer:"van", source_trace:"content_pool.decodable_words[5]" },
+        { topicType:"english_picture_spelling", word:"pan", answer:"pan", source_trace:"content_pool.decodable_words[7]" },
+        { topicType:"english_picture_spelling", word:"cap", answer:"cap", source_trace:"content_pool.decodable_words[9]" }
+      ]
+    },
+    p3: {
+      pageNumber: 3, instructionId:"instr_listen_word_circle_picture",
+      instructionText:"Listen to the word. Circle the picture.",
+      englishLetterTopicList: [
+        { topicType:"english_circle_picture", options:["yak","cat","mat"], correctWords:["yak"],
+          source_trace_map:{ "options[0]":"content_pool.decodable_words[6]", "options[1]":"content_pool.decodable_words[0]", "options[2]":"content_pool.decodable_words[4]" } },
+        { topicType:"english_circle_picture", options:["hat","nap","fan"], correctWords:["nap"],
+          source_trace_map:{ "options[0]":"content_pool.decodable_words[1]", "options[1]":"content_pool.decodable_words[8]", "options[2]":"content_pool.decodable_words[2]" } },
+        { topicType:"english_circle_picture", options:["bat","gap","van"], correctWords:["gap"], source_trace_map:{} },
+        { topicType:"english_circle_picture", options:["pan","cap","yam"], correctWords:["yam"], source_trace_map:{} }
+      ]
+    },
+    p4: {
+      pageNumber: 4, instructionId:"instr_listen_word_match_line",
+      instructionText:"Listen to the word. Draw a line to match.",
+      englishLetterTopicList: [
+        { topicType:"english_matching", matchType:"picture_to_word",
+          topItems:    [{id:"t1",value:"dad"},{id:"t2",value:"cat"},{id:"t3",value:"hat"},{id:"t4",value:"bat"}],
+          bottomItems: [{id:"b1",value:"hat"},{id:"b2",value:"bat"},{id:"b3",value:"dad"},{id:"b4",value:"cat"}],
+          correctPairs:["t1-b3","t2-b4","t3-b1","t4-b2"],
+          source_trace_map:{
+            "topItems[0].value":"content_pool.decodable_words[12]",
+            "topItems[1].value":"content_pool.decodable_words[0]",
+            "topItems[2].value":"content_pool.decodable_words[1]",
+            "topItems[3].value":"content_pool.decodable_words[3]"
+          }
+        }
+      ]
+    },
+    p5: {
+      pageNumber: 5, instructionId:"instr_listen_word_fill_missing",
+      instructionText:"Listen to the word. Fill in the missing sound.",
+      englishLetterTopicList: [
+        { topicType:"english_sound_box_partial_fill", word:"fan", blankBefore:"",  blankAfter:"an", answer:"f",
+          source_trace:"content_pool.decodable_words[2]" },
+        { topicType:"english_sound_box_partial_fill", word:"van", blankBefore:"v", blankAfter:"n",  answer:"a",
+          source_trace:"content_pool.decodable_words[5]" },
+        { topicType:"english_sound_box_partial_fill", word:"cap", blankBefore:"ca",blankAfter:"",   answer:"p",
+          source_trace:"content_pool.decodable_words[9]" },
+        { topicType:"english_sound_box_partial_fill", word:"dad", blankBefore:"d", blankAfter:"d",  answer:"a",
+          source_trace:"content_pool.decodable_words[12]" }
+      ]
+    }
+  };
+
+  // ============ Invariant-based test runner ============
+  const runner = (() => {
+    let pass = 0, fail = 0;
+    const ul = document.getElementById('results');
+    const stats = document.getElementById('stats');
+    function record(name, ok, err) {
+      const li = document.createElement('li');
+      li.className = ok ? 'pass' : 'fail';
+      li.textContent = (ok ? '✓ ' : '✗ ') + name + (err ? ' — ' + err : '');
+      ul.appendChild(li);
+      ok ? pass++ : fail++;
+    }
+    function check(name, fn) {
+      try { fn(); record(name, true); }
+      catch (e) { record(name, false, e.message); console.error(name, e); }
+    }
+    function done() {
+      const total = pass + fail;
+      stats.textContent = `${pass}/${total} passing` + (fail ? ` (${fail} failed)` : '');
+      stats.style.background = fail ? '#f8d7da' : '#d4edda';
+      stats.style.color = fail ? '#721c24' : '#155724';
+      document.title = `Tests: ${pass}/${total}`;
+    }
+    return { check, done };
+  })();
+
+  function eq(actual, expected, label) {
+    const a = JSON.stringify(actual);
+    const e = JSON.stringify(expected);
+    if (a !== e) throw new Error(label + ': expected ' + e + ', got ' + a);
+  }
+  function assert(cond, msg) { if (!cond) throw new Error(msg); }
+
+  // ============ Tests ============
+
+  const T = window.JOJO_BITABLE.translatePage;
+
+  runner.check('Page 1 — sound_box_full → T-SOUNDBOX v2', () => {
+    const r = T(PAGES.p1, {}, 'K-1_U01', 'K');
+    eq(r.kind, 'legacy', 'kind');
+    eq(r.templateId, 'T-SOUNDBOX', 'templateId');
+    eq(r.variant, 'v2', 'variant');
+    eq(r.data.instruction_text, 'Listen to the word. Write each sound in a box.', 'instr text');
+    eq(r.data.instruction_audio, '/assets/audio/instr/K-1_U01_p1.mp3', 'instr audio');
+    eq(r.data.items.length, 4, 'items.length');
+    eq(r.data.items[0].image, 'cat.webp', 'item[0].image');
+    eq(r.data.items[0].audio, 'cat.mp3', 'item[0].audio');
+    eq(r.data.items[0].phonemes, ['c','a','t'], 'item[0].phonemes');
+    eq(r.data.items[0].prefill, ['','',''], 'item[0].prefill (full blank)');
+    eq(r.data.items[0].boxes, 3, 'item[0].boxes');
+    eq(r.sourceTraces[0], 'content_pool.decodable_words[0]', 'sourceTraces[0]');
+    eq(r.sourceTraces[3], 'content_pool.decodable_words[4]', 'sourceTraces[3]');
+  });
+
+  runner.check('Page 2 — picture_spelling → T-WRITE v2', () => {
+    const r = T(PAGES.p2, {}, 'K-1_U01', 'K');
+    eq(r.kind, 'legacy', 'kind');
+    eq(r.templateId, 'T-WRITE', 'templateId');
+    eq(r.variant, 'v2', 'variant');
+    eq(r.data.items.length, 4, 'items.length');
+    eq(r.data.items[0].prompt_image, 'fan.webp', 'item[0].prompt_image');
+    eq(r.data.items[0].prompt_audio, 'fan.mp3', 'item[0].prompt_audio');
+    eq(r.data.items[0].answer, 'fan', 'item[0].answer');
+    eq(r.data.items[3].answer, 'cap', 'item[3].answer');
+    eq(r.sourceTraces[0], 'content_pool.decodable_words[2]', 'sourceTraces[0]');
+  });
+
+  runner.check('Page 3 — circle_picture → circle_multi 4 rows', () => {
+    const r = T(PAGES.p3, {}, 'K-1_U01', 'K');
+    eq(r.kind, 'circle_multi', 'kind');
+    eq(r.rows.length, 4, 'rows.length');
+    eq(r.rows[0].options, ['yak','cat','mat'], 'row[0].options');
+    eq(r.rows[0].correct, ['yak'], 'row[0].correct');
+    eq(r.rows[1].correct, ['nap'], 'row[1].correct');
+    eq(r.rows[2].correct, ['gap'], 'row[2].correct');
+    eq(r.rows[3].correct, ['yam'], 'row[3].correct');
+    eq(r.rows[0].sourceTraceMap['options[0]'], 'content_pool.decodable_words[6]', 'row[0] sourceTraceMap');
+    eq(r.ctx.instructionText, 'Listen to the word. Circle the picture.', 'instructionText');
+  });
+
+  runner.check('Page 4 — matching → T-MATCH v2 (image left, word right)', () => {
+    const r = T(PAGES.p4, {}, 'K-1_U01', 'K');
+    eq(r.kind, 'legacy', 'kind');
+    eq(r.templateId, 'T-MATCH', 'templateId');
+    eq(r.variant, 'v2', 'variant');
+    eq(r.data.pairs.length, 4, 'pairs.length');
+    eq(r.data.pairs[0].left,  { content:'dad.webp', type:'image', audio:'dad.mp3' }, 'pair[0].left');
+    eq(r.data.pairs[0].right, { content:'dad', type:'word' }, 'pair[0].right');
+    eq(r.data.pairs[1].left.content, 'cat.webp', 'pair[1].left.content');
+    eq(r.data.pairs[2].left.content, 'hat.webp', 'pair[2].left.content');
+    eq(r.data.pairs[3].left.content, 'bat.webp', 'pair[3].left.content');
+    eq(r.sourceTraces[0], 'content_pool.decodable_words[12]', 'sourceTraces[0] (dad)');
+  });
+
+  runner.check('Page 5 — sound_box_partial_fill → T-SOUNDBOX v1 with blank position math', () => {
+    const r = T(PAGES.p5, {}, 'K-1_U01', 'K');
+    eq(r.kind, 'legacy', 'kind');
+    eq(r.templateId, 'T-SOUNDBOX', 'templateId');
+    eq(r.variant, 'v1', 'variant');
+    eq(r.data.items.length, 4, 'items.length');
+    // fan: blankBefore="" answer="f" blankAfter="an" → phonemes=[f,a,n], prefill=['',a,n]
+    eq(r.data.items[0].phonemes, ['f','a','n'], 'fan.phonemes');
+    eq(r.data.items[0].prefill,  ['', 'a','n'], 'fan.prefill');
+    eq(r.data.items[0].boxes, 3, 'fan.boxes');
+    // van: blankBefore="v" answer="a" blankAfter="n" → phonemes=[v,a,n], prefill=[v,'',n]
+    eq(r.data.items[1].phonemes, ['v','a','n'], 'van.phonemes');
+    eq(r.data.items[1].prefill,  ['v','', 'n'], 'van.prefill');
+    // cap: blankBefore="ca" answer="p" blankAfter="" → phonemes=[c,a,p], prefill=[c,a,'']
+    eq(r.data.items[2].phonemes, ['c','a','p'], 'cap.phonemes');
+    eq(r.data.items[2].prefill,  ['c','a',''],  'cap.prefill');
+    // dad: blankBefore="d" answer="a" blankAfter="d" → phonemes=[d,a,d], prefill=[d,'',d]
+    eq(r.data.items[3].phonemes, ['d','a','d'], 'dad.phonemes');
+    eq(r.data.items[3].prefill,  ['d','', 'd'], 'dad.prefill');
+  });
+
+  runner.check('Falls back to instructionId when instructionText missing', () => {
+    const page = { ...PAGES.p1, instructionText: undefined };
+    const r = T(page, {}, 'K-1_U01', 'K');
+    assert(r.ctx.instructionFallback === true, 'instructionFallback flag set');
+    assert(r.ctx.instructionText === 'instr_listen_word_soundbox', 'instructionText falls back to id');
+  });
+
+  runner.check('Mixed topicTypes → unsupported', () => {
+    const page = {
+      pageNumber: 99,
+      instructionText: 'mixed',
+      englishLetterTopicList: [
+        { topicType: 'english_sound_box_full', word:'cat', answer:['c','a','t'] },
+        { topicType: 'english_picture_spelling', word:'fan', answer:'fan' }
+      ]
+    };
+    const r = T(page, {}, 'K-1_U01', 'K');
+    eq(r.kind, 'unsupported', 'kind');
+    assert(/mixed/.test(r.reason), 'reason mentions mixed');
+  });
+
+  runner.check('Unknown topicType → unsupported', () => {
+    const page = {
+      pageNumber: 99, instructionText: 'unknown',
+      englishLetterTopicList: [{ topicType: 'english_imagined_new_type', word:'x' }]
+    };
+    const r = T(page, {}, 'K-1_U01', 'K');
+    eq(r.kind, 'unsupported', 'kind');
+    assert(/unknown topicType/.test(r.reason), 'reason mentions unknown');
+  });
+
+  runner.check('Empty topic list → unsupported', () => {
+    const r = T({ pageNumber: 99, instructionText:'empty', englishLetterTopicList: [] }, {}, 'K-1_U01', 'K');
+    eq(r.kind, 'unsupported', 'kind');
+  });
+
+  runner.done();
+  </script>
+</body>
+</html>

@@ -8,7 +8,17 @@
     templateId: null,
     variant: null,
     grade: null,
-    annotationsOn: false
+    annotationsOn: false,
+    mode: 'demo',
+    bitable: {
+      workbook: 'K-1',
+      unitCode: null,
+      unitData: null,
+      pageIndex: 0,
+      recordUrl: null,
+      jsonMode: 'raw',
+      lastTranslated: null
+    }
   };
 
   // ========== Interaction Guide Data ==========
@@ -179,11 +189,30 @@
   var jsonToggleIcon = jsonToggleBtn.querySelector('.json-toggle-icon');
   var jsonContentEl = document.getElementById('json-content');
   var jsonCodeEl = document.getElementById('json-code');
+  // Bitable mode refs
+  var modeRadios = document.querySelectorAll('input[name="mode"]');
+  var bitableControlsEl = document.getElementById('bitable-controls');
+  var bitablePageHeaderEl = document.getElementById('bitable-page-header');
+  var controlsEl = document.getElementById('controls');
+  var btWorkbookSel = document.getElementById('bt-workbook');
+  var btUnitSel = document.getElementById('bt-unit');
+  var btPrevBtn = document.getElementById('bt-prev');
+  var btNextBtn = document.getElementById('bt-next');
+  var btPageLabel = document.getElementById('bt-page-label');
+  var btStatusEl = document.getElementById('bt-status');
+  var btPhUnit = document.getElementById('bt-ph-unit');
+  var btPhPage = document.getElementById('bt-ph-page');
+  var btPhTotal = document.getElementById('bt-ph-total');
+  var btPhStatus = document.getElementById('bt-ph-status');
+  var btPhRecordLink = document.getElementById('bt-ph-record-link');
+  var jsonModeToggleEl = document.getElementById('json-mode-toggle');
+  var assetManifestLoaded = false;
 
   // ========== Init ==========
   function init() {
     buildSidebar();
     bindEvents();
+    initBitableMode();
     restoreFromHash();
   }
 
@@ -452,6 +481,182 @@
     jsonToggleBtn.addEventListener('click', onJsonToggle);
     worksheetEl.addEventListener('mouseover', onWorksheetHover);
     window.addEventListener('hashchange', restoreFromHash);
+  }
+
+  // ========== Bitable Mode ==========
+  function initBitableMode() {
+    modeRadios.forEach(function (r) {
+      r.addEventListener('change', onModeChange);
+    });
+    btUnitSel.addEventListener('change', function () {
+      var code = btUnitSel.value;
+      if (code) loadBitableUnit(code);
+    });
+    btPrevBtn.addEventListener('click', function () { stepBitablePage(-1); });
+    btNextBtn.addEventListener('click', function () { stepBitablePage(1); });
+    document.addEventListener('keydown', function (e) {
+      if (state.mode !== 'bitable') return;
+      if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA')) return;
+      if (e.key === 'ArrowLeft') { e.preventDefault(); stepBitablePage(-1); }
+      if (e.key === 'ArrowRight') { e.preventDefault(); stepBitablePage(1); }
+    });
+    jsonModeToggleEl.querySelectorAll('button').forEach(function (b) {
+      b.addEventListener('click', function () {
+        setJsonMode(b.dataset.jsonMode);
+      });
+    });
+  }
+
+  function onModeChange() {
+    var mode = document.querySelector('input[name="mode"]:checked').value;
+    state.mode = mode;
+    if (mode === 'bitable') {
+      templateListEl.hidden = true;
+      bitableControlsEl.hidden = false;
+      bitablePageHeaderEl.hidden = false;
+      controlsEl.hidden = true;
+      jsonModeToggleEl.hidden = false;
+      ensureAssetManifest().then(loadBitableUnits);
+    } else {
+      templateListEl.hidden = false;
+      bitableControlsEl.hidden = true;
+      bitablePageHeaderEl.hidden = true;
+      controlsEl.hidden = false;
+      jsonModeToggleEl.hidden = true;
+      // Re-render demo mode if a template was selected
+      if (state.templateId) render();
+      else worksheetEl.innerHTML = '<div id="worksheet-empty"><p>Select a template from the left panel</p></div>';
+    }
+  }
+
+  function ensureAssetManifest() {
+    if (assetManifestLoaded) return Promise.resolve();
+    return window.JOJO_BITABLE.loadAssetManifest().then(function () {
+      assetManifestLoaded = true;
+    });
+  }
+
+  function setBitableStatus(msg, isError) {
+    btStatusEl.textContent = msg || '';
+    btStatusEl.style.color = isError ? '#c33' : 'var(--text-secondary)';
+  }
+
+  function loadBitableUnits() {
+    setBitableStatus('Loading units...');
+    fetch('/api/units?workbook=' + encodeURIComponent(state.bitable.workbook))
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+      .then(function (resp) {
+        if (!resp.ok) throw new Error(resp.body && resp.body.error || 'units fetch failed');
+        var units = (resp.body.units || []);
+        btUnitSel.innerHTML = '';
+        units.forEach(function (u) {
+          var opt = document.createElement('option');
+          opt.value = u.unit_code;
+          var statusLabel = u.status === 'Approved' ? '' : ' (' + (u.status || 'Not Started') + ')';
+          opt.textContent = u.unit_code + statusLabel;
+          opt.disabled = u.status !== 'Approved';
+          opt.dataset.status = u.status || '';
+          btUnitSel.appendChild(opt);
+        });
+        var firstApproved = units.find(function (u) { return u.status === 'Approved'; });
+        if (firstApproved) {
+          btUnitSel.value = firstApproved.unit_code;
+          loadBitableUnit(firstApproved.unit_code);
+        } else {
+          setBitableStatus('No Approved units in ' + state.bitable.workbook, true);
+        }
+      })
+      .catch(function (err) {
+        setBitableStatus('Units load failed: ' + err.message, true);
+      });
+  }
+
+  function loadBitableUnit(code) {
+    state.bitable.unitCode = code;
+    setBitableStatus('Loading ' + code + '...');
+    fetch('/api/unit/' + encodeURIComponent(code))
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+      .then(function (resp) {
+        if (!resp.ok) throw new Error(resp.body && resp.body.error || 'unit fetch failed');
+        state.bitable.unitData = resp.body;
+        state.bitable.pageIndex = 0;
+        state.bitable.recordUrl = resp.body.record_url || null;
+        setBitableStatus(resp.body.fetched_at ? 'Loaded · ' + resp.body.fetched_at.slice(11, 19) : '');
+        renderBitablePage(0);
+      })
+      .catch(function (err) {
+        setBitableStatus('Unit load failed: ' + err.message, true);
+        worksheetEl.innerHTML = '<div id="worksheet-empty"><p style="color:#c33">' + err.message + '</p></div>';
+      });
+  }
+
+  function stepBitablePage(delta) {
+    var unit = state.bitable.unitData;
+    if (!unit || !unit.pages) return;
+    var n = unit.pages.length;
+    var next = state.bitable.pageIndex + delta;
+    if (next < 0 || next >= n) return;
+    renderBitablePage(next);
+  }
+
+  function renderBitablePage(idx) {
+    var unit = state.bitable.unitData;
+    if (!unit) return;
+    var pages = unit.pages || [];
+    if (idx < 0 || idx >= pages.length) return;
+    state.bitable.pageIndex = idx;
+    var page = pages[idx];
+
+    var translated = window.JOJO_BITABLE.translatePage(page, unit.content_pool, unit.unit_code, 'K');
+    state.bitable.lastTranslated = translated;
+
+    window.JOJO_BITABLE.renderPage(translated, worksheetEl);
+
+    // Update page header
+    btPhUnit.textContent = unit.unit_code;
+    btPhPage.textContent = String(idx + 1);
+    btPhTotal.textContent = String(pages.length);
+    btPhStatus.textContent = unit.status || '';
+    if (unit.record_url) {
+      btPhRecordLink.href = unit.record_url;
+      btPhRecordLink.hidden = false;
+    } else {
+      btPhRecordLink.hidden = true;
+    }
+
+    // Update page nav
+    btPageLabel.textContent = (idx + 1) + ' / ' + pages.length;
+    btPrevBtn.disabled = idx === 0;
+    btNextBtn.disabled = idx >= pages.length - 1;
+
+    // Update JSON panel
+    refreshBitableJson();
+  }
+
+  function refreshBitableJson() {
+    var unit = state.bitable.unitData;
+    var idx = state.bitable.pageIndex;
+    if (!unit || !unit.pages || !unit.pages[idx]) {
+      jsonCodeEl.textContent = '// No page';
+      return;
+    }
+    var page = unit.pages[idx];
+    if (state.bitable.jsonMode === 'translated') {
+      var t = state.bitable.lastTranslated || {};
+      jsonCodeEl.textContent = JSON.stringify(
+        t.kind === 'legacy' ? t.data : t,
+        null, 2);
+    } else {
+      jsonCodeEl.textContent = JSON.stringify(page, null, 2);
+    }
+  }
+
+  function setJsonMode(mode) {
+    state.bitable.jsonMode = mode;
+    jsonModeToggleEl.querySelectorAll('button').forEach(function (b) {
+      b.classList.toggle('active', b.dataset.jsonMode === mode);
+    });
+    refreshBitableJson();
   }
 
   // ========== Boot ==========
