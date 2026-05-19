@@ -253,6 +253,57 @@
     eq(r.kind, 'unsupported', 'kind');
   });
 
+  // ============ templateMeta assertions (Phase 2) ============
+
+  runner.check('Page 1 templateMeta → T-SOUNDBOX › Sound Box - Full', () => {
+    const r = T(PAGES.p1, {}, 'K-1_U01', 'K');
+    eq(r.templateMeta, { templateId: 'T-SOUNDBOX', variantNumber: 2, variantName: 'Sound Box - Full' }, 'templateMeta');
+  });
+
+  runner.check('Page 2 templateMeta → T-SPELL › Picture Spelling', () => {
+    const r = T(PAGES.p2, {}, 'K-1_U01', 'K');
+    eq(r.templateMeta, { templateId: 'T-SPELL', variantNumber: 2, variantName: 'Picture Spelling' }, 'templateMeta');
+  });
+
+  runner.check('Page 3 templateMeta single-correct → T-CIRCLE › Circle Picture by Sound', () => {
+    const r = T(PAGES.p3, {}, 'K-1_U01', 'K');
+    eq(r.templateMeta, { templateId: 'T-CIRCLE', variantNumber: 1, variantName: 'Circle Picture by Sound' }, 'templateMeta');
+  });
+
+  runner.check('Page 4 templateMeta picture_to_word → T-MATCH › Match Picture to Word', () => {
+    const r = T(PAGES.p4, {}, 'K-1_U01', 'K');
+    eq(r.templateMeta, { templateId: 'T-MATCH', variantNumber: 2, variantName: 'Match Picture to Word' }, 'templateMeta');
+  });
+
+  runner.check('Page 5 templateMeta → T-SOUNDBOX › Sound Box - Partial Fill', () => {
+    const r = T(PAGES.p5, {}, 'K-1_U01', 'K');
+    eq(r.templateMeta, { templateId: 'T-SOUNDBOX', variantNumber: 1, variantName: 'Sound Box - Partial Fill' }, 'templateMeta');
+  });
+
+  runner.check('Circle multi-correct → T-CIRCLE › Circle Pictures by Digraph', () => {
+    const page = {
+      pageNumber: 99, instructionText: 'digraph circle',
+      englishLetterTopicList: [
+        { topicType:'english_circle_picture', options:['ship','chip','chess','sash'], correctWords:['ship','sash'], source_trace_map:{} }
+      ]
+    };
+    const r = T(page, {}, 'K-1_U01', 'K');
+    eq(r.templateMeta, { templateId: 'T-CIRCLE', variantNumber: 2, variantName: 'Circle Pictures by Digraph' }, 'templateMeta');
+  });
+
+  runner.check('Unknown matchType → T-MATCH › (unknown matchType: foo)', () => {
+    const page = {
+      pageNumber: 99, instructionText: 'matching',
+      englishLetterTopicList: [
+        { topicType:'english_matching', matchType:'foo', topItems:[{id:'t1',value:'x'}], bottomItems:[{id:'b1',value:'x'}], correctPairs:['t1-b1'] }
+      ]
+    };
+    const r = T(page, {}, 'K-1_U01', 'K');
+    eq(r.templateMeta.templateId, 'T-MATCH', 'templateId');
+    eq(r.templateMeta.variantNumber, null, 'variantNumber');
+    assert(/unknown matchType: foo/.test(r.templateMeta.variantName), 'variantName mentions unknown');
+  });
+
   runner.done();
   </script>
 </body>

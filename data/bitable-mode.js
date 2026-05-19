@@ -226,6 +226,48 @@
     english_matching:               translateMatching
   };
 
+  // ============ Template / variant labels (SSOT: Bitable 題型 Template 表) ============
+  // Display only — decoupled from internal renderer ID. Renderer registry uses legacy
+  // T-WRITE / T-LISTEN; canonical Bitable names are T-SPELL / T-DICTATION etc.
+  const TEMPLATE_VARIANT_MAP = {
+    english_sound_box_full:
+      () => ({ templateId: 'T-SOUNDBOX', variantNumber: 2, variantName: 'Sound Box - Full' }),
+    english_sound_box_partial_fill:
+      () => ({ templateId: 'T-SOUNDBOX', variantNumber: 1, variantName: 'Sound Box - Partial Fill' }),
+    english_picture_spelling:
+      () => ({ templateId: 'T-SPELL', variantNumber: 2, variantName: 'Picture Spelling' }),
+    english_circle_picture: (topics) => {
+      const multi = ((topics[0] && topics[0].correctWords && topics[0].correctWords.length) || 0) > 1;
+      return multi
+        ? { templateId: 'T-CIRCLE', variantNumber: 2, variantName: 'Circle Pictures by Digraph' }
+        : { templateId: 'T-CIRCLE', variantNumber: 1, variantName: 'Circle Picture by Sound' };
+    },
+    english_matching: (topics) => {
+      const m = topics[0] && topics[0].matchType;
+      const SUB = {
+        letter_case:     { variantNumber: 1, variantName: 'Match Letter Case' },
+        picture_to_word: { variantNumber: 2, variantName: 'Match Picture to Word' },
+        synonyms:        { variantNumber: 3, variantName: 'Match Synonyms' },
+        antonyms:        { variantNumber: 3, variantName: 'Match Antonyms' },
+        sound_to_word:   { variantNumber: 4, variantName: 'Match Sound to Word' }
+      };
+      const sub = SUB[m] || { variantNumber: null, variantName: '(unknown matchType: ' + m + ')' };
+      return Object.assign({ templateId: 'T-MATCH' }, sub);
+    }
+  };
+
+  function resolveTemplateMeta(topicType, topics) {
+    const fn = TEMPLATE_VARIANT_MAP[topicType];
+    if (!fn) {
+      return {
+        templateId: '???',
+        variantNumber: null,
+        variantName: topicType ? '(unknown topicType: ' + topicType + ')' : '(no topic)'
+      };
+    }
+    return fn(topics);
+  }
+
   // ============ translatePage ============
 
   function translatePage(page, contentPool, unitCode, grade) {
@@ -246,19 +288,26 @@
     };
 
     if (topics.length === 0) {
-      return { kind: 'unsupported', reason: 'no english topics', ctx, rawPage: page };
+      return {
+        kind: 'unsupported', reason: 'no english topics', ctx, rawPage: page,
+        templateMeta: resolveTemplateMeta(null, [])
+      };
     }
 
     const types = [...new Set(topics.map((t) => t.topicType))];
     if (types.length !== 1) {
-      return { kind: 'unsupported', reason: 'mixed topic types: ' + types.join(','), ctx, rawPage: page };
+      return {
+        kind: 'unsupported', reason: 'mixed topic types: ' + types.join(','),
+        ctx, rawPage: page, templateMeta: resolveTemplateMeta(null, topics)
+      };
     }
     const type = types[0];
+    const templateMeta = resolveTemplateMeta(type, topics);
 
     if (type === 'english_circle_picture') {
       return {
         kind: 'circle_multi',
-        ctx,
+        ctx, templateMeta,
         rows: topics.map((t) => ({
           options: (t.options || []).slice(),
           correct: (t.correctWords || []).slice(),
@@ -269,16 +318,20 @@
 
     const translator = TOPIC_TRANSLATORS[type];
     if (!translator) {
-      return { kind: 'unsupported', reason: 'unknown topicType: ' + type, ctx, rawPage: page };
+      return {
+        kind: 'unsupported', reason: 'unknown topicType: ' + type,
+        ctx, rawPage: page, templateMeta
+      };
     }
 
     try {
       const result = translator(topics, ctx);
       result.ctx = ctx;
+      result.templateMeta = templateMeta;
       return result;
     } catch (e) {
       console.error('[bitable] translator error', e);
-      return { kind: 'error', reason: e.message, ctx, rawPage: page };
+      return { kind: 'error', reason: e.message, ctx, rawPage: page, templateMeta };
     }
   }
 

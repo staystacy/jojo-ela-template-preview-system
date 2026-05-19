@@ -205,6 +205,8 @@
   var btPhTotal = document.getElementById('bt-ph-total');
   var btPhStatus = document.getElementById('bt-ph-status');
   var btPhRecordLink = document.getElementById('bt-ph-record-link');
+  var btPhTemplateId = document.getElementById('bt-ph-template-id');
+  var btPhVariantName = document.getElementById('bt-ph-variant-name');
   var jsonModeToggleEl = document.getElementById('json-mode-toggle');
   var assetManifestLoaded = false;
 
@@ -623,6 +625,13 @@
     } else {
       btPhRecordLink.hidden = true;
     }
+
+    // Template / variant chip (母題版 / 子題版)
+    var meta = translated.templateMeta || { templateId: '???', variantNumber: null, variantName: '(no metadata)' };
+    btPhTemplateId.textContent = meta.templateId || '???';
+    btPhTemplateId.classList.toggle('bt-ph-unknown', !meta.templateId || meta.templateId === '???');
+    var vn = meta.variantNumber != null ? meta.variantNumber + '. ' : '';
+    btPhVariantName.textContent = (meta.variantName ? ' › ' + vn + meta.variantName : '');
 
     // Update page nav
     btPageLabel.textContent = (idx + 1) + ' / ' + pages.length;
