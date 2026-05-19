@@ -630,8 +630,7 @@
     var meta = translated.templateMeta || { templateId: '???', variantNumber: null, variantName: '(no metadata)' };
     btPhTemplateId.textContent = meta.templateId || '???';
     btPhTemplateId.classList.toggle('bt-ph-unknown', !meta.templateId || meta.templateId === '???');
-    var vn = meta.variantNumber != null ? meta.variantNumber + '. ' : '';
-    btPhVariantName.textContent = (meta.variantName ? ' › ' + vn + meta.variantName : '');
+    btPhVariantName.textContent = meta.variantName ? ' › ' + meta.variantName : '';
 
     // Update page nav
     btPageLabel.textContent = (idx + 1) + ' / ' + pages.length;

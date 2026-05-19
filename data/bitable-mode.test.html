@@ -255,32 +255,32 @@
 
   // ============ templateMeta assertions (Phase 2) ============
 
-  runner.check('Page 1 templateMeta → T-SOUNDBOX › Sound Box - Full', () => {
+  runner.check('Page 1 templateMeta → T-SOUNDBOX › Sound Box - Full (2 Rows)', () => {
     const r = T(PAGES.p1, {}, 'K-1_U01', 'K');
-    eq(r.templateMeta, { templateId: 'T-SOUNDBOX', variantNumber: 2, variantName: 'Sound Box - Full' }, 'templateMeta');
+    eq(r.templateMeta, { templateId: 'T-SOUNDBOX', variantNumber: 2, variantName: 'Sound Box - Full (2 Rows)' }, 'templateMeta');
   });
 
-  runner.check('Page 2 templateMeta → T-SPELL › Picture Spelling', () => {
+  runner.check('Page 2 templateMeta → T-SPELL › Picture Spelling (4 Cells)', () => {
     const r = T(PAGES.p2, {}, 'K-1_U01', 'K');
-    eq(r.templateMeta, { templateId: 'T-SPELL', variantNumber: 2, variantName: 'Picture Spelling' }, 'templateMeta');
+    eq(r.templateMeta, { templateId: 'T-SPELL', variantNumber: 2, variantName: 'Picture Spelling (4 Cells)' }, 'templateMeta');
   });
 
-  runner.check('Page 3 templateMeta single-correct → T-CIRCLE › Circle Picture by Sound', () => {
+  runner.check('Page 3 templateMeta single-correct → T-CIRCLE › Circle Picture by Sound (3 Cards, Single Choice)', () => {
     const r = T(PAGES.p3, {}, 'K-1_U01', 'K');
-    eq(r.templateMeta, { templateId: 'T-CIRCLE', variantNumber: 1, variantName: 'Circle Picture by Sound' }, 'templateMeta');
+    eq(r.templateMeta, { templateId: 'T-CIRCLE', variantNumber: 1, variantName: 'Circle Picture by Sound (3 Cards, Single Choice)' }, 'templateMeta');
   });
 
-  runner.check('Page 4 templateMeta picture_to_word → T-MATCH › Match Picture to Word', () => {
+  runner.check('Page 4 templateMeta picture_to_word → T-MATCH › Match Picture to Word (4 Pairs)', () => {
     const r = T(PAGES.p4, {}, 'K-1_U01', 'K');
-    eq(r.templateMeta, { templateId: 'T-MATCH', variantNumber: 2, variantName: 'Match Picture to Word' }, 'templateMeta');
+    eq(r.templateMeta, { templateId: 'T-MATCH', variantNumber: 2, variantName: 'Match Picture to Word (4 Pairs)' }, 'templateMeta');
   });
 
-  runner.check('Page 5 templateMeta → T-SOUNDBOX › Sound Box - Partial Fill', () => {
+  runner.check('Page 5 templateMeta → T-SOUNDBOX › Sound Box - Partial Fill (4 Rows, 2x2)', () => {
     const r = T(PAGES.p5, {}, 'K-1_U01', 'K');
-    eq(r.templateMeta, { templateId: 'T-SOUNDBOX', variantNumber: 1, variantName: 'Sound Box - Partial Fill' }, 'templateMeta');
+    eq(r.templateMeta, { templateId: 'T-SOUNDBOX', variantNumber: 1, variantName: 'Sound Box - Partial Fill (4 Rows, 2x2)' }, 'templateMeta');
   });
 
-  runner.check('Circle multi-correct → T-CIRCLE › Circle Pictures by Digraph', () => {
+  runner.check('Circle multi-correct → T-CIRCLE › Circle Pictures by Digraph (4 Cards, Multi-Select)', () => {
     const page = {
       pageNumber: 99, instructionText: 'digraph circle',
       englishLetterTopicList: [
@@ -288,7 +288,7 @@
       ]
     };
     const r = T(page, {}, 'K-1_U01', 'K');
-    eq(r.templateMeta, { templateId: 'T-CIRCLE', variantNumber: 2, variantName: 'Circle Pictures by Digraph' }, 'templateMeta');
+    eq(r.templateMeta, { templateId: 'T-CIRCLE', variantNumber: 2, variantName: 'Circle Pictures by Digraph (4 Cards, Multi-Select)' }, 'templateMeta');
   });
 
   runner.check('Unknown matchType → T-MATCH › (unknown matchType: foo)', () => {

@@ -229,27 +229,30 @@
   // ============ Template / variant labels (SSOT: Bitable 題型 Template 表) ============
   // Display only — decoupled from internal renderer ID. Renderer registry uses legacy
   // T-WRITE / T-LISTEN; canonical Bitable names are T-SPELL / T-DICTATION etc.
+  // variantName must match the full descriptor verbatim from Bitable 題型 Template
+  // 題型 Variant column (e.g. "Sound Box - Full (2 Rows)"). variantNumber is kept
+  // for internal indexing/debugging but not shown in UI.
   const TEMPLATE_VARIANT_MAP = {
     english_sound_box_full:
-      () => ({ templateId: 'T-SOUNDBOX', variantNumber: 2, variantName: 'Sound Box - Full' }),
+      () => ({ templateId: 'T-SOUNDBOX', variantNumber: 2, variantName: 'Sound Box - Full (2 Rows)' }),
     english_sound_box_partial_fill:
-      () => ({ templateId: 'T-SOUNDBOX', variantNumber: 1, variantName: 'Sound Box - Partial Fill' }),
+      () => ({ templateId: 'T-SOUNDBOX', variantNumber: 1, variantName: 'Sound Box - Partial Fill (4 Rows, 2x2)' }),
     english_picture_spelling:
-      () => ({ templateId: 'T-SPELL', variantNumber: 2, variantName: 'Picture Spelling' }),
+      () => ({ templateId: 'T-SPELL', variantNumber: 2, variantName: 'Picture Spelling (4 Cells)' }),
     english_circle_picture: (topics) => {
       const multi = ((topics[0] && topics[0].correctWords && topics[0].correctWords.length) || 0) > 1;
       return multi
-        ? { templateId: 'T-CIRCLE', variantNumber: 2, variantName: 'Circle Pictures by Digraph' }
-        : { templateId: 'T-CIRCLE', variantNumber: 1, variantName: 'Circle Picture by Sound' };
+        ? { templateId: 'T-CIRCLE', variantNumber: 2, variantName: 'Circle Pictures by Digraph (4 Cards, Multi-Select)' }
+        : { templateId: 'T-CIRCLE', variantNumber: 1, variantName: 'Circle Picture by Sound (3 Cards, Single Choice)' };
     },
     english_matching: (topics) => {
       const m = topics[0] && topics[0].matchType;
       const SUB = {
-        letter_case:     { variantNumber: 1, variantName: 'Match Letter Case' },
-        picture_to_word: { variantNumber: 2, variantName: 'Match Picture to Word' },
-        synonyms:        { variantNumber: 3, variantName: 'Match Synonyms' },
-        antonyms:        { variantNumber: 3, variantName: 'Match Antonyms' },
-        sound_to_word:   { variantNumber: 4, variantName: 'Match Sound to Word' }
+        letter_case:     { variantNumber: 1, variantName: 'Match Letter Case (4 Pairs)' },
+        picture_to_word: { variantNumber: 2, variantName: 'Match Picture to Word (4 Pairs)' },
+        synonyms:        { variantNumber: 3, variantName: 'Match Synonyms (4 Pairs)' },
+        antonyms:        { variantNumber: 3, variantName: 'Match Antonyms (4 Pairs)' },
+        sound_to_word:   { variantNumber: 4, variantName: 'Match Sound to Word (4 Pairs)' }
       };
       const sub = SUB[m] || { variantNumber: null, variantName: '(unknown matchType: ' + m + ')' };
       return Object.assign({ templateId: 'T-MATCH' }, sub);
