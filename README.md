@@ -66,21 +66,19 @@ node server.js   # 預設 :3000
 打開 [http://localhost:3000/data/bitable-mode.test.html](http://localhost:3000/data/bitable-mode.test.html)
 看 translator 測試結果（全綠才能發 PR）。
 
-### 已實作的 topicType（K-1a U01）
+### 已實作的 topicType（K-1a 全部 9 種）
 | topicType | 母題版 / 子題版 |
 |---|---|
 | `english_sound_box_full` | T-SOUNDBOX › Sound Box - Full (2 Rows) |
 | `english_sound_box_partial_fill` | T-SOUNDBOX › Sound Box - Partial Fill (4 Rows, 2x2) |
 | `english_picture_spelling` | T-SPELL › Picture Spelling (4 Cells) |
-| `english_circle_picture` | T-CIRCLE › Circle Picture by Sound (3 Cards, Single Choice) |
+| `english_circle_picture` | T-CIRCLE › Circle Picture by Sound / Pictures by Digraph |
 | `english_matching` | T-MATCH › Match Picture to Word (4 Pairs) |
-| `english_trace_word` | T-TRACE › Shadow Writing - Word (4 Cells) |
+| `english_trace_word` | T-TRACE › Shadow / Guided to Freehand / Freehand Writing - Word (4 Cells) |
 | `english_onset_rime_blend` | T-BLEND › Onset-Rime Blend (2 Rows) |
-
-### 未實作（顯示 unsupported notice）
-- `english_phoneme_blend_picture` → T-BLEND › Phoneme Blend - Picture Support (2 Rows)
-- `english_word_bank_cloze` → T-FILLIN › Word Bank Cloze (2 Rows)
-- `english_find_word` → T-FINDWORD › Find Words in Grid
+| `english_phoneme_blend_picture` | T-BLEND › Phoneme Blend - Picture Support (2 Rows) |
+| `english_word_bank_cloze` | T-FILLIN › Word Bank Cloze (2 Rows) |
+| `english_find_word` | T-FINDWORD › Find Words in Grid |
 
 ### 已知限制
 - 缺資產的 word fallback 為帶 `⚠ <file> missing` 警示的灰色 placeholder

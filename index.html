@@ -26,8 +26,10 @@
 
   <div id="app-body">
     <aside id="sidebar">
-      <div class="sidebar-header">Templates</div>
-      <nav id="template-list"></nav>
+      <div id="demo-sidebar-block">
+        <div class="sidebar-header">Templates</div>
+        <nav id="template-list"></nav>
+      </div>
 
       <div id="bitable-controls" hidden>
         <div class="sidebar-header">Bitable Source</div>
@@ -52,14 +54,19 @@
       <header id="bitable-page-header" hidden>
         <span class="bt-ph-meta">
           <strong id="bt-ph-unit">—</strong>
+          <span id="bt-ph-subtitle-wrap" hidden> · <em id="bt-ph-subtitle"></em></span>
           · Page <span id="bt-ph-page">-</span>/<span id="bt-ph-total">-</span>
+          <span id="bt-ph-overall-wrap" hidden> · <span class="bt-ph-overall">Overall <span id="bt-ph-overall">-</span>/<span id="bt-ph-overall-total">-</span></span></span>
           · <span class="bt-ph-template">
               <code id="bt-ph-template-id">—</code>
               <span id="bt-ph-variant-name"></span>
             </span>
           <span id="bt-ph-status-wrap"> · <span id="bt-ph-status"></span></span>
         </span>
-        <a id="bt-ph-record-link" href="#" target="_blank" rel="noopener" hidden>↗ Open JSON</a>
+        <span class="bt-ph-right">
+          <code id="bt-ph-filename"></code>
+          <a id="bt-ph-record-link" href="#" target="_blank" rel="noopener" hidden>↗ Open JSON</a>
+        </span>
       </header>
 
       <div id="worksheet-container">

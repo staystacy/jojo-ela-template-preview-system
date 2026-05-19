@@ -191,9 +191,9 @@
     }
     const words = t.wordsList;
     const SCAFFOLD_BY_GUIDE = {
-      'All Guide':  ['trace', 'trace', 'trace', 'trace'],
-      'Half Guide': ['trace', 'trace', 'faded', 'faded'],
-      'No Guide':   ['blank', 'blank', 'blank', 'blank']
+      'All Guide':          ['trace', 'trace', 'trace', 'trace'],
+      'Guided to Freehand': ['trace', 'trace', 'faded', 'faded'],
+      'Free':               ['blank', 'blank', 'blank', 'blank']
     };
     const guide = t.guideMode || 'All Guide';
     const scaffolds = SCAFFOLD_BY_GUIDE[guide] || words.map(() => 'trace');
@@ -254,6 +254,91 @@
     };
   }
 
+  function translatePhonemeBlendPicture(topics, ctx) {
+    const t = topics[0];
+    if (!t || !Array.isArray(t.rows)) {
+      throw new Error('phoneme_blend_picture topic missing rows');
+    }
+    const rows = t.rows;
+    return {
+      kind: 'legacy',
+      templateId: 'T-BLEND',
+      variant: 'v2',
+      sourceTraces: rows.map(() => null),
+      data: {
+        page_id: ctx.pageId,
+        template_id: 'T-BLEND',
+        variant: 'v2',
+        grade: ctx.grade,
+        instruction_text: ctx.instructionText,
+        instruction_audio: ctx.instructionAudio,
+        cell_size: 48,
+        items: rows.map((r) => ({
+          phoneme_audios: (r.phonemes || []).map((p) => p + '.mp3'),
+          phoneme_labels: (r.phonemes || []).map((p) => '/' + p + '/'),
+          image: (r.imageName || r.word) + '.webp',
+          answer: r.answer || r.word
+        }))
+      }
+    };
+  }
+
+  function translateWordBankCloze(topics, ctx) {
+    const t = topics[0];
+    if (!t || !Array.isArray(t.rows)) {
+      throw new Error('word_bank_cloze topic missing rows');
+    }
+    const rows = t.rows;
+    const bank = Array.isArray(t.wordBank) ? t.wordBank : [];
+    return {
+      kind: 'legacy',
+      templateId: 'T-FILLIN',
+      variant: 'v3',
+      sourceTraces: rows.map(() => null),
+      data: {
+        page_id: ctx.pageId,
+        template_id: 'T-FILLIN',
+        variant: 'v3',
+        grade: ctx.grade,
+        instruction_text: ctx.instructionText,
+        instruction_audio: ctx.instructionAudio,
+        cell_size: 36,
+        word_bank: bank.map((w) => (typeof w === 'string' ? w : (w && w.text) || '')),
+        items: rows.map((r) => ({
+          display: (r.sentence || '').replace(/_+/g, '_'),
+          blank_position: 0,
+          blank_length: (r.answer || '').length || 1,
+          answer: r.answer || ''
+        }))
+      }
+    };
+  }
+
+  function translateFindWord(topics, ctx) {
+    const t = topics[0];
+    if (!t || !Array.isArray(t.options)) {
+      throw new Error('find_word topic missing options grid');
+    }
+    return {
+      kind: 'legacy',
+      templateId: 'T-FINDWORD',
+      variant: 'v1',
+      sourceTraces: null,
+      data: {
+        page_id: ctx.pageId,
+        template_id: 'T-FINDWORD',
+        variant: 'v1',
+        grade: ctx.grade,
+        instruction_text: ctx.instructionText,
+        instruction_audio: ctx.instructionAudio,
+        target_words: (t.words || []).map((w) => String(w).toLowerCase()),
+        grid: (t.options || []).map((row) =>
+          row.map((c) => String(c).toLowerCase())
+        )
+      }
+    };
+  }
+
   function translateMatching(topics, ctx) {
     const t = topics[0];
     if (!t || !t.topItems || !t.bottomItems || !t.correctPairs) {
@@ -295,7 +380,10 @@
     english_picture_spelling:       translatePictureSpelling,
     english_matching:               translateMatching,
     english_trace_word:             translateTraceWord,
-    english_onset_rime_blend:       translateOnsetRimeBlend
+    english_onset_rime_blend:       translateOnsetRimeBlend,
+    english_phoneme_blend_picture:  translatePhonemeBlendPicture,
+    english_word_bank_cloze:        translateWordBankCloze,
+    english_find_word:              translateFindWord
   };
 
   // ============ Template / variant labels (SSOT: Bitable 題型 Template 表) ============
@@ -332,9 +420,9 @@
     english_trace_word: (topics) => {
       const g = (topics[0] && topics[0].guideMode) || 'All Guide';
       const SUB = {
-        'All Guide':  { variantNumber: 8,  variantName: 'Shadow Writing - Word (4 Cells)' },
-        'Half Guide': { variantNumber: 9,  variantName: 'Guided to Freehand - Word (4 Cells)' },
-        'No Guide':   { variantNumber: 10, variantName: 'Freehand Writing - Word (4 Cells)' }
+        'All Guide':          { variantNumber: 8,  variantName: 'Shadow Writing - Word (4 Cells)' },
+        'Guided to Freehand': { variantNumber: 9,  variantName: 'Guided to Freehand - Word (4 Cells)' },
+        'Free':               { variantNumber: 10, variantName: 'Freehand Writing - Word (4 Cells)' }
       };
       const sub = SUB[g] || { variantNumber: null, variantName: '(unknown guideMode: ' + g + ')' };
       return Object.assign({ templateId: 'T-TRACE' }, sub);
@@ -481,11 +569,29 @@
   }
 
   function renderErrorNotice(translated, container) {
+    const meta = translated.templateMeta || {};
+    const tplLabel = meta.templateId
+      ? '<code>' + escapeHtml(meta.templateId) + '</code>'
+        + (meta.variantName ? ' › ' + escapeHtml(meta.variantName) : '')
+      : '(unknown)';
+    const reason = translated.reason || translated.error || '(unknown)';
+    const topicType = (translated.rawPage
+      && translated.rawPage.englishLetterTopicList
+      && translated.rawPage.englishLetterTopicList[0]
+      && translated.rawPage.englishLetterTopicList[0].topicType) || null;
+    const hintLine = topicType
+      ? 'Add a translator in <code>data/bitable-mode.js</code> mapping <code>'
+        + escapeHtml(topicType) + '</code> → an existing renderer.'
+      : reason;
+
     const div = document.createElement('div');
     div.className = 'ws-bitable-error';
-    div.innerHTML = '<strong>Unsupported / error page</strong>: ' +
-      escapeHtml(translated.reason || translated.error || '(unknown)') +
-      '<pre>' + escapeHtml(JSON.stringify(translated.rawPage || translated, null, 2)) + '</pre>';
+    div.innerHTML =
+      '<div class="ws-bitable-error-head"><strong>Not yet rendered</strong> · ' + tplLabel + '</div>' +
+      '<p class="hint">' + hintLine + '</p>' +
+      '<details><summary>Show raw JSON</summary>' +
+      '<pre>' + escapeHtml(JSON.stringify(translated.rawPage || translated, null, 2)) + '</pre>' +
+      '</details>';
     container.appendChild(div);
   }
 

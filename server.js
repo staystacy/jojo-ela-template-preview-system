@@ -24,6 +24,8 @@ const ASSETS_DIR = process.env.ASSETS_DIR
   || '/Users/stacywang/Desktop/JOJO-Worksheet-Research/10-Final-Assets';
 const PAGES_DIR  = process.env.PAGES_DIR
   || '/Users/stacywang/Desktop/JOJO-Worksheet-Research/03-Preview-Tool/data/workbooks';
+const NAMING_CSV = process.env.NAMING_CSV
+  || '/Users/stacywang/Desktop/JOJO-Worksheet-Research/Framework/QA1-output/naming.csv';
 
 // ---------- Boot: scan asset manifest ----------
 function scanAssetManifest() {
@@ -60,6 +62,47 @@ function scanAssetManifest() {
     words
   };
 }
+
+// ---------- Boot: read workbook naming.csv ----------
+function readNamingCsv() {
+  try {
+    const raw = fs.readFileSync(NAMING_CSV, 'utf8');
+    const lines = raw.split(/\r?\n/).filter(Boolean);
+    if (lines.length < 2) return {};
+    // Header: Workbook ID,Title,Title Len,Subtitle,Subtitle Len,Description,...
+    const titles = {};
+    for (let i = 1; i < lines.length; i++) {
+      // Naive CSV parse: split on commas not inside quotes
+      const cells = parseCsvLine(lines[i]);
+      const id = cells[0] && cells[0].trim();
+      const title = cells[1] && cells[1].trim();
+      const subtitle = cells[3] && cells[3].trim();
+      if (id) titles[id] = { title: title || '', subtitle: subtitle || '' };
+    }
+    return titles;
+  } catch (e) {
+    console.warn('[server] naming.csv not readable:', NAMING_CSV, e.message);
+    return {};
+  }
+}
+
+function parseCsvLine(line) {
+  const out = [];
+  let cur = '';
+  let inQuote = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"' && line[i+1] === '"' && inQuote) { cur += '"'; i++; continue; }
+    if (ch === '"') { inQuote = !inQuote; continue; }
+    if (ch === ',' && !inQuote) { out.push(cur); cur = ''; continue; }
+    cur += ch;
+  }
+  out.push(cur);
+  return out;
+}
+
+const workbookTitles = readNamingCsv();
+console.log(`[server] naming.csv: ${Object.keys(workbookTitles).length} workbook titles loaded`);
 
 const assetManifest = scanAssetManifest();
 const imageCount = Object.values(assetManifest.words).filter((w) => w.image).length;
@@ -170,6 +213,7 @@ app.get('/api/units', (req, res) => {
     const workbooks = [...new Set(all.map((u) => u.workbook))].sort();
     res.json({
       workbooks,
+      workbook_titles: workbookTitles,
       units: filtered.map((r) => ({
         unit_code: r.unit_code,
         workbook: r.workbook,

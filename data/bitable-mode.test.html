@@ -58,6 +58,52 @@
         }
       ]
     },
+    phonemeBlend: {
+      pageId: 100403, pageNumber: 18,
+      englishLetterTopicList: [
+        {
+          id: 1, topicId: 1, topicNumber: 1,
+          topicType: "english_phoneme_blend_picture",
+          instructionText: "Listen to each sound. Blend and write the word.",
+          rows: [
+            { word: "hit", imageName: "hit", phonemes: ["h", "i", "t"], answer: "hit" },
+            { word: "kid", imageName: "kid", phonemes: ["k", "i", "d"], answer: "kid" }
+          ]
+        }
+      ]
+    },
+    wordBankCloze: {
+      pageId: 100405, pageNumber: 20,
+      englishLetterTopicList: [
+        {
+          topicId: 1, topicNumber: 1,
+          topicType: "english_word_bank_cloze",
+          instructionText: "Pick a word from the word bank. Write it in the blank.",
+          wordBank: [{text:"cat"}, {text:"pig"}, {text:"hat"}, {text:"kid"}],
+          rows: [
+            { sentence: "I see a ___.", answer: "cat" },
+            { sentence: "The ___ is big.", answer: "pig" }
+          ]
+        }
+      ]
+    },
+    findWord: {
+      pageId: 100504, pageNumber: 24,
+      instructionText: "Find and circle each word in the grid.",
+      englishLetterTopicList: [
+        {
+          id: 1, topicId: 1, topicNumber: 1,
+          topicType: "english_find_word",
+          words: ["cat", "pig", "sit"],
+          options: [
+            ["C","A","T","P"],
+            ["P","I","G","I"],
+            ["S","I","T","E"],
+            ["B","D","K","Z"]
+          ]
+        }
+      ]
+    },
     p1: {
       pageId: "auto", pageNumber: 1, planPageNumber: 1,
       stageName: "EnglishStage1",
@@ -248,11 +294,23 @@
     eq(r.data.items[3].prefill,  ['d','', 'd'], 'dad.prefill');
   });
 
-  runner.check('Falls back to instructionId when instructionText missing', () => {
+  runner.check('Uses topicType default instruction when instructionText missing', () => {
     const page = { ...PAGES.p1, instructionText: undefined };
     const r = T(page, {}, 'K-1_U01', 'K');
-    assert(r.ctx.instructionFallback === true, 'instructionFallback flag set');
-    assert(r.ctx.instructionText === 'instr_listen_word_soundbox', 'instructionText falls back to id');
+    assert(r.ctx.instructionFallback === false, 'fallback flag stays false when default applies');
+    assert(r.ctx.instructionText === 'Listen to the word. Write each sound in a box.',
+      'instructionText comes from TOPIC_DEFAULT_INSTR');
+  });
+
+  runner.check('Falls back to instructionId when both instructionText and default missing', () => {
+    const page = {
+      pageNumber: 99,
+      instructionId: 'instr_made_up',
+      englishLetterTopicList: [{ topicType: 'english_no_such_default', word: 'x' }]
+    };
+    const r = T(page, {}, 'K-1a_U01', 'K');
+    assert(r.ctx.instructionFallback === true, 'fallback flag set');
+    assert(r.ctx.instructionText === 'instr_made_up', 'falls back to id');
   });
 
   runner.check('Mixed topicTypes → unsupported', () => {
@@ -349,12 +407,57 @@
     eq(r.templateMeta, { templateId: 'T-BLEND', variantNumber: 1, variantName: 'Onset-Rime Blend (2 Rows)' }, 'templateMeta');
   });
 
-  runner.check('Trace_word guideMode "Half Guide" → mixed scaffolds', () => {
+  runner.check('Trace_word guideMode "Guided to Freehand" → mixed scaffolds', () => {
     const page = JSON.parse(JSON.stringify(PAGES.trace));
-    page.englishLetterTopicList[0].guideMode = 'Half Guide';
+    page.englishLetterTopicList[0].guideMode = 'Guided to Freehand';
     const r = T(page, {}, 'K-1a_U01', 'K');
-    eq(r.data.cells.map(c => c.scaffold), ['trace','trace','faded','faded'], 'half-guide scaffolds');
+    eq(r.data.cells.map(c => c.scaffold), ['trace','trace','faded','faded'], 'guided-to-freehand scaffolds');
     eq(r.templateMeta.variantNumber, 9, 'variantNumber 9');
+  });
+
+  runner.check('Trace_word guideMode "Free" → all blank + variant 10', () => {
+    const page = JSON.parse(JSON.stringify(PAGES.trace));
+    page.englishLetterTopicList[0].guideMode = 'Free';
+    const r = T(page, {}, 'K-1a_U01', 'K');
+    eq(r.data.cells.map(c => c.scaffold), ['blank','blank','blank','blank'], 'free scaffolds');
+    eq(r.templateMeta.variantNumber, 10, 'variantNumber 10');
+    eq(r.templateMeta.variantName, 'Freehand Writing - Word (4 Cells)', 'variantName');
+  });
+
+  runner.check('phoneme_blend_picture → T-BLEND v2 with phoneme arrays', () => {
+    const r = T(PAGES.phonemeBlend, {}, 'K-1a_U04', 'K');
+    eq(r.kind, 'legacy', 'kind');
+    eq(r.templateId, 'T-BLEND', 'templateId');
+    eq(r.variant, 'v2', 'variant');
+    eq(r.data.items.length, 2, 'items.length');
+    eq(r.data.items[0].phoneme_labels, ['/h/','/i/','/t/'], 'phoneme labels');
+    eq(r.data.items[0].phoneme_audios, ['h.mp3','i.mp3','t.mp3'], 'phoneme audios');
+    eq(r.data.items[0].image, 'hit.webp', 'image');
+    eq(r.templateMeta, { templateId: 'T-BLEND', variantNumber: 2, variantName: 'Phoneme Blend - Picture Support (2 Rows)' }, 'templateMeta');
+  });
+
+  runner.check('word_bank_cloze → T-FILLIN v3 with word_bank + display', () => {
+    const r = T(PAGES.wordBankCloze, {}, 'K-1a_U04', 'K');
+    eq(r.kind, 'legacy', 'kind');
+    eq(r.templateId, 'T-FILLIN', 'templateId');
+    eq(r.variant, 'v3', 'variant');
+    eq(r.data.word_bank, ['cat','pig','hat','kid'], 'word_bank flattened');
+    eq(r.data.items.length, 2, 'items.length');
+    eq(r.data.items[0].display, 'I see a _.', 'underscore collapsed');
+    eq(r.data.items[0].blank_length, 3, 'blank_length = answer.length');
+    eq(r.data.items[0].answer, 'cat', 'answer');
+    eq(r.templateMeta, { templateId: 'T-FILLIN', variantNumber: 1, variantName: 'Word Bank Cloze (2 Rows)' }, 'templateMeta');
+  });
+
+  runner.check('find_word → T-FINDWORD v1 with lowercased grid + targets', () => {
+    const r = T(PAGES.findWord, {}, 'K-1a_U05', 'K');
+    eq(r.kind, 'legacy', 'kind');
+    eq(r.templateId, 'T-FINDWORD', 'templateId');
+    eq(r.variant, 'v1', 'variant');
+    eq(r.data.target_words, ['cat','pig','sit'], 'targets');
+    eq(r.data.grid[0], ['c','a','t','p'], 'row[0] lowercased');
+    eq(r.data.grid.length, 4, 'grid rows');
+    eq(r.templateMeta.templateId, 'T-FINDWORD', 'templateId');
   });
 
   runner.check('Unknown matchType → T-MATCH › (unknown matchType: foo)', () => {
