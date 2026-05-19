@@ -38,47 +38,50 @@ src/                  # Preview tool source code (TBD)
 | Framework Design Doc | Why decisions were made, research data, expert/parent optimizations |
 | Preview Prompt v2 | Full build instructions for the preview tool |
 
-## 本地 Bitable 模式
+## 本地 JSON 模式
 
-從 Bitable 抓 Approved 單元的 `generator_output`，在瀏覽器渲染練習題給審教者比對。
+從本地 `data/workbooks/<workbook>/U<NN>_P<NN>.json` 讀題目（每頁一個 JSON），對齊研發 spec，在瀏覽器渲染給審教者比對。
 
 ### 前置
 - Node.js ≥ 18
-- `lark-cli` 已安裝且 `lark-cli auth login` 完成
-- 資產目錄存在於 `~/Desktop/JOJO-Worksheet-Research/10-Final-Assets/`
-- Bitable `generator_output` 含 `instructionText`（K-1_U01 已 ready）
+- 題目 JSON 在 `~/Desktop/JOJO-Worksheet-Research/03-Preview-Tool/data/workbooks/<workbook>/`
+- 資產目錄在 `~/Desktop/JOJO-Worksheet-Research/10-Final-Assets/`
+- JSON 標準參考 `Framework/ELA-Template-json-260518.html`
 
 ### 啟動
 ```bash
 npm install
-source ~/.config/stacy-secrets/.env   # 載入 lark-cli token
-node server.js                          # 預設 :3000
+node server.js   # 預設 :3000
 ```
-瀏覽器開 [http://localhost:3000](http://localhost:3000)，header 切到 **Bitable Mode**。
+瀏覽器開 [http://localhost:3000](http://localhost:3000)，header 切到 **Bitable Mode**（歷史名稱，現在讀本地 JSON）。
 
 ### 環境變數（可選）
 | Var | Default |
 |---|---|
 | `PORT` | 3000 |
 | `ASSETS_DIR` | `~/Desktop/JOJO-Worksheet-Research/10-Final-Assets` |
-| `BITABLE_BASE_TOKEN` | `YSoZbDOKCadq3Ys4c9Gl0FkYgqe` |
-| `BITABLE_TABLE_ID` | `tblRw0GDwu5DXVJG` |
-| `BITABLE_HOST` | `feishu.cn` |
-| `LARK_CLI_BIN` | `lark-cli` |
-| `CACHE_TTL_MS` | 300000（5 分鐘）|
+| `PAGES_DIR` | `~/Desktop/JOJO-Worksheet-Research/03-Preview-Tool/data/workbooks` |
 
 ### 單元測試
 打開 [http://localhost:3000/data/bitable-mode.test.html](http://localhost:3000/data/bitable-mode.test.html)
 看 translator 測試結果（全綠才能發 PR）。
 
-### 支援的 topicType（K-1_U01）
-- `english_sound_box_full` → T-SOUNDBOX v2
-- `english_sound_box_partial_fill` → T-SOUNDBOX v1
-- `english_picture_spelling` → T-WRITE v2
-- `english_circle_picture` → Bitable 專用 multi-row renderer
-- `english_matching` → T-MATCH v2
+### 已實作的 topicType（K-1a U01）
+| topicType | 母題版 / 子題版 |
+|---|---|
+| `english_sound_box_full` | T-SOUNDBOX › Sound Box - Full (2 Rows) |
+| `english_sound_box_partial_fill` | T-SOUNDBOX › Sound Box - Partial Fill (4 Rows, 2x2) |
+| `english_picture_spelling` | T-SPELL › Picture Spelling (4 Cells) |
+| `english_circle_picture` | T-CIRCLE › Circle Picture by Sound (3 Cards, Single Choice) |
+| `english_matching` | T-MATCH › Match Picture to Word (4 Pairs) |
+| `english_trace_word` | T-TRACE › Shadow Writing - Word (4 Cells) |
+| `english_onset_rime_blend` | T-BLEND › Onset-Rime Blend (2 Rows) |
+
+### 未實作（顯示 unsupported notice）
+- `english_phoneme_blend_picture` → T-BLEND › Phoneme Blend - Picture Support (2 Rows)
+- `english_word_bank_cloze` → T-FILLIN › Word Bank Cloze (2 Rows)
+- `english_find_word` → T-FINDWORD › Find Words in Grid
 
 ### 已知限制
-- 目前只支援上述 5 種 topicType（新型別→ unsupported notice）
 - 缺資產的 word fallback 為帶 `⚠ <file> missing` 警示的灰色 placeholder
 - instruction 音檔（`{unit_code}_p{N}.mp3`）尚未生成，按鈕一律 disabled

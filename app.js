@@ -11,11 +11,11 @@
     annotationsOn: false,
     mode: 'demo',
     bitable: {
-      workbook: 'K-1',
+      workbook: null,
+      workbooks: [],
       unitCode: null,
       unitData: null,
       pageIndex: 0,
-      recordUrl: null,
       jsonMode: 'raw',
       lastTranslated: null
     }
@@ -204,6 +204,7 @@
   var btPhPage = document.getElementById('bt-ph-page');
   var btPhTotal = document.getElementById('bt-ph-total');
   var btPhStatus = document.getElementById('bt-ph-status');
+  var btPhStatusWrap = document.getElementById('bt-ph-status-wrap');
   var btPhRecordLink = document.getElementById('bt-ph-record-link');
   var btPhTemplateId = document.getElementById('bt-ph-template-id');
   var btPhVariantName = document.getElementById('bt-ph-variant-name');
@@ -215,7 +216,17 @@
     buildSidebar();
     bindEvents();
     initBitableMode();
+    bindBitableSelectors();
     restoreFromHash();
+  }
+
+  function bindBitableSelectors() {
+    btWorkbookSel.addEventListener('change', function () {
+      var wb = btWorkbookSel.value;
+      if (!wb) return;
+      state.bitable.workbook = wb;
+      populateUnitSelector();
+    });
   }
 
   // ========== Sidebar ==========
@@ -544,33 +555,52 @@
   }
 
   function loadBitableUnits() {
-    setBitableStatus('Loading units...');
-    fetch('/api/units?workbook=' + encodeURIComponent(state.bitable.workbook))
+    setBitableStatus('Loading workbooks...');
+    fetch('/api/units')
       .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
       .then(function (resp) {
         if (!resp.ok) throw new Error(resp.body && resp.body.error || 'units fetch failed');
-        var units = (resp.body.units || []);
-        btUnitSel.innerHTML = '';
-        units.forEach(function (u) {
+        state.bitable._allUnits = resp.body.units || [];
+        state.bitable.workbooks = resp.body.workbooks || [];
+
+        // Populate workbook selector
+        btWorkbookSel.innerHTML = '';
+        state.bitable.workbooks.forEach(function (wb) {
           var opt = document.createElement('option');
-          opt.value = u.unit_code;
-          var statusLabel = u.status === 'Approved' ? '' : ' (' + (u.status || 'Not Started') + ')';
-          opt.textContent = u.unit_code + statusLabel;
-          opt.disabled = u.status !== 'Approved';
-          opt.dataset.status = u.status || '';
-          btUnitSel.appendChild(opt);
+          opt.value = wb;
+          opt.textContent = wb;
+          btWorkbookSel.appendChild(opt);
         });
-        var firstApproved = units.find(function (u) { return u.status === 'Approved'; });
-        if (firstApproved) {
-          btUnitSel.value = firstApproved.unit_code;
-          loadBitableUnit(firstApproved.unit_code);
-        } else {
-          setBitableStatus('No Approved units in ' + state.bitable.workbook, true);
+        if (!state.bitable.workbook || state.bitable.workbooks.indexOf(state.bitable.workbook) === -1) {
+          state.bitable.workbook = state.bitable.workbooks[0] || null;
         }
+        if (state.bitable.workbook) btWorkbookSel.value = state.bitable.workbook;
+
+        populateUnitSelector();
       })
       .catch(function (err) {
         setBitableStatus('Units load failed: ' + err.message, true);
       });
+  }
+
+  function populateUnitSelector() {
+    var all = state.bitable._allUnits || [];
+    var units = state.bitable.workbook
+      ? all.filter(function (u) { return u.workbook === state.bitable.workbook; })
+      : all;
+    btUnitSel.innerHTML = '';
+    units.forEach(function (u) {
+      var opt = document.createElement('option');
+      opt.value = u.unit_code;
+      opt.textContent = u.unit_code + ' (' + u.page_count + ' pages)';
+      btUnitSel.appendChild(opt);
+    });
+    if (units.length > 0) {
+      btUnitSel.value = units[0].unit_code;
+      loadBitableUnit(units[0].unit_code);
+    } else {
+      setBitableStatus('No units found in ' + state.bitable.workbook, true);
+    }
   }
 
   function loadBitableUnit(code) {
@@ -582,7 +612,6 @@
         if (!resp.ok) throw new Error(resp.body && resp.body.error || 'unit fetch failed');
         state.bitable.unitData = resp.body;
         state.bitable.pageIndex = 0;
-        state.bitable.recordUrl = resp.body.record_url || null;
         setBitableStatus(resp.body.fetched_at ? 'Loaded · ' + resp.body.fetched_at.slice(11, 19) : '');
         renderBitablePage(0);
       })
@@ -619,8 +648,11 @@
     btPhPage.textContent = String(idx + 1);
     btPhTotal.textContent = String(pages.length);
     btPhStatus.textContent = unit.status || '';
-    if (unit.record_url) {
-      btPhRecordLink.href = unit.record_url;
+    btPhStatusWrap.hidden = !unit.status;
+
+    var sourceUrl = unit.source_files && unit.source_files[idx];
+    if (sourceUrl) {
+      btPhRecordLink.href = sourceUrl;
       btPhRecordLink.hidden = false;
     } else {
       btPhRecordLink.hidden = true;

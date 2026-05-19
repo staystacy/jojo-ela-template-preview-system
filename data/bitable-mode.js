@@ -184,6 +184,76 @@
     };
   }
 
+  function translateTraceWord(topics, ctx) {
+    const t = topics[0];
+    if (!t || !Array.isArray(t.wordsList)) {
+      throw new Error('trace_word topic missing wordsList');
+    }
+    const words = t.wordsList;
+    const SCAFFOLD_BY_GUIDE = {
+      'All Guide':  ['trace', 'trace', 'trace', 'trace'],
+      'Half Guide': ['trace', 'trace', 'faded', 'faded'],
+      'No Guide':   ['blank', 'blank', 'blank', 'blank']
+    };
+    const guide = t.guideMode || 'All Guide';
+    const scaffolds = SCAFFOLD_BY_GUIDE[guide] || words.map(() => 'trace');
+    const first = words[0] || {};
+    return {
+      kind: 'legacy',
+      templateId: 'T-TRACE',
+      variant: 'v2',
+      sourceTraces: words.map(() => null),
+      data: {
+        page_id: ctx.pageId,
+        template_id: 'T-TRACE',
+        variant: 'v2',
+        grade: ctx.grade,
+        instruction_text: ctx.instructionText,
+        instruction_audio: ctx.instructionAudio,
+        cell_size: 48,
+        demo_area: {
+          content: first.word || '',
+          animation: 'stroke_order',
+          audio: first.audioName ? first.audioName + '.mp3' : null,
+          image: first.imageName ? first.imageName + '.webp' : null
+        },
+        cells: words.map((w, i) => ({
+          scaffold: scaffolds[i] || 'trace',
+          content: w.word
+        }))
+      }
+    };
+  }
+
+  function translateOnsetRimeBlend(topics, ctx) {
+    const t = topics[0];
+    if (!t || !Array.isArray(t.rows)) {
+      throw new Error('onset_rime_blend topic missing rows');
+    }
+    const rows = t.rows;
+    return {
+      kind: 'legacy',
+      templateId: 'T-BLEND',
+      variant: 'v1',
+      sourceTraces: rows.map(() => null),
+      data: {
+        page_id: ctx.pageId,
+        template_id: 'T-BLEND',
+        variant: 'v1',
+        grade: ctx.grade,
+        instruction_text: ctx.instructionText,
+        instruction_audio: ctx.instructionAudio,
+        cell_size: 56,
+        items: rows.map((r) => ({
+          phoneme_audios: [r.onset + '.mp3', r.rime + '.mp3'],
+          phoneme_labels: ['/' + r.onset + '/', '/' + r.rime + '/'],
+          image: (r.imageName || r.word) + '.webp',
+          answer: r.answer || r.word
+        }))
+      }
+    };
+  }
+
   function translateMatching(topics, ctx) {
     const t = topics[0];
     if (!t || !t.topItems || !t.bottomItems || !t.correctPairs) {
@@ -223,7 +293,9 @@
     english_sound_box_full:         translateSoundBoxFull,
     english_sound_box_partial_fill: translateSoundBoxPartialFill,
     english_picture_spelling:       translatePictureSpelling,
-    english_matching:               translateMatching
+    english_matching:               translateMatching,
+    english_trace_word:             translateTraceWord,
+    english_onset_rime_blend:       translateOnsetRimeBlend
   };
 
   // ============ Template / variant labels (SSOT: Bitable 題型 Template 表) ============
@@ -256,7 +328,25 @@
       };
       const sub = SUB[m] || { variantNumber: null, variantName: '(unknown matchType: ' + m + ')' };
       return Object.assign({ templateId: 'T-MATCH' }, sub);
-    }
+    },
+    english_trace_word: (topics) => {
+      const g = (topics[0] && topics[0].guideMode) || 'All Guide';
+      const SUB = {
+        'All Guide':  { variantNumber: 8,  variantName: 'Shadow Writing - Word (4 Cells)' },
+        'Half Guide': { variantNumber: 9,  variantName: 'Guided to Freehand - Word (4 Cells)' },
+        'No Guide':   { variantNumber: 10, variantName: 'Freehand Writing - Word (4 Cells)' }
+      };
+      const sub = SUB[g] || { variantNumber: null, variantName: '(unknown guideMode: ' + g + ')' };
+      return Object.assign({ templateId: 'T-TRACE' }, sub);
+    },
+    english_onset_rime_blend:
+      () => ({ templateId: 'T-BLEND', variantNumber: 1, variantName: 'Onset-Rime Blend (2 Rows)' }),
+    english_phoneme_blend_picture:
+      () => ({ templateId: 'T-BLEND', variantNumber: 2, variantName: 'Phoneme Blend - Picture Support (2 Rows)' }),
+    english_word_bank_cloze:
+      () => ({ templateId: 'T-FILLIN', variantNumber: 1, variantName: 'Word Bank Cloze (2 Rows)' }),
+    english_find_word:
+      () => ({ templateId: 'T-FINDWORD', variantNumber: null, variantName: 'Find Words in Grid' })
   };
 
   function resolveTemplateMeta(topicType, topics) {
@@ -277,9 +367,26 @@
     grade = grade || 'K';
     const topics = (page && page.englishLetterTopicList) || [];
 
-    const instructionTextRaw = page && page.instructionText;
-    const instructionText = instructionTextRaw || (page && page.instructionId) || '(no instruction)';
-    const instructionFallback = !instructionTextRaw && !!(page && page.instructionId);
+    // instructionText resolution order: page-level → topic-level → topicType default → instructionId → fallback
+    const TOPIC_DEFAULT_INSTR = {
+      english_trace_word: 'Trace each word along the guide lines.',
+      english_sound_box_full: 'Listen to the word. Write each sound in a box.',
+      english_sound_box_partial_fill: 'Listen to the word. Fill in the missing sound.',
+      english_picture_spelling: 'Look at the picture. Write the word.',
+      english_circle_picture: 'Listen to the word. Circle the picture.',
+      english_matching: 'Listen to the word. Draw a line to match.',
+      english_onset_rime_blend: 'Tap each sound. Blend them together. Write the word.',
+      english_phoneme_blend_picture: 'Listen to each sound. Blend and write the word.',
+      english_word_bank_cloze: 'Pick a word from the word bank. Write it in the blank.',
+      english_find_word: 'Find and circle each word in the grid.'
+    };
+    const pageInstr = page && page.instructionText;
+    const topicInstr = topics[0] && topics[0].instructionText;
+    const topicTypeForDefault = topics[0] && topics[0].topicType;
+    const defaultInstr = TOPIC_DEFAULT_INSTR[topicTypeForDefault];
+    const instructionTextRaw = pageInstr || topicInstr;
+    const instructionText = instructionTextRaw || defaultInstr || (page && page.instructionId) || '(no instruction)';
+    const instructionFallback = !instructionTextRaw && !defaultInstr && !!(page && page.instructionId);
     const instructionAudio = '/assets/audio/instr/' + unitCode + '_p' + (page && page.pageNumber) + '.mp3';
 
     const ctx = {

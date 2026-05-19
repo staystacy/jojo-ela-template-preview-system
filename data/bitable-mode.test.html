@@ -27,6 +27,37 @@
   // ============ Fixtures (extracted from real Bitable K-1_U01 generator_output) ============
 
   const PAGES = {
+    trace: {
+      pageId: 100101, pageNumber: 1,
+      englishLetterTopicList: [
+        {
+          id: 1, topicId: 1, topicNumber: 1,
+          topicType: "english_trace_word",
+          guideMode: "All Guide",
+          wordsList: [
+            { word: "cat", imageName: "cat", audioName: "cat" },
+            { word: "hat", imageName: "hat", audioName: "hat" },
+            { word: "map", imageName: "map", audioName: "map" },
+            { word: "bag", imageName: "bag", audioName: "bag" }
+          ]
+        }
+      ]
+    },
+    blend: {
+      pageId: 100103, pageNumber: 3,
+      englishLetterTopicList: [
+        {
+          id: 1, topicId: 1, topicNumber: 1,
+          topicType: "english_onset_rime_blend",
+          instructionText: "Tap each sound. Blend them together. Write the word.",
+          instructionKey: "tap_each_sound_blend_them_together_write_the_word",
+          rows: [
+            { word: "cat", imageName: "cat", onset: "c", rime: "at", answer: "cat" },
+            { word: "hat", imageName: "hat", onset: "h", rime: "at", answer: "hat" }
+          ]
+        }
+      ]
+    },
     p1: {
       pageId: "auto", pageNumber: 1, planPageNumber: 1,
       stageName: "EnglishStage1",
@@ -289,6 +320,41 @@
     };
     const r = T(page, {}, 'K-1_U01', 'K');
     eq(r.templateMeta, { templateId: 'T-CIRCLE', variantNumber: 2, variantName: 'Circle Pictures by Digraph (4 Cards, Multi-Select)' }, 'templateMeta');
+  });
+
+  runner.check('K-1a U01 P1 trace_word → T-TRACE renderer with 4 trace cells', () => {
+    const r = T(PAGES.trace, {}, 'K-1a_U01', 'K');
+    eq(r.kind, 'legacy', 'kind');
+    eq(r.templateId, 'T-TRACE', 'templateId');
+    eq(r.variant, 'v2', 'variant');
+    eq(r.data.cells.length, 4, 'cells.length');
+    eq(r.data.cells.map(c => c.scaffold), ['trace','trace','trace','trace'], 'scaffolds');
+    eq(r.data.cells.map(c => c.content), ['cat','hat','map','bag'], 'cell contents');
+    eq(r.data.demo_area.content, 'cat', 'demo content');
+    eq(r.data.demo_area.image, 'cat.webp', 'demo image');
+    eq(r.templateMeta, { templateId: 'T-TRACE', variantNumber: 8, variantName: 'Shadow Writing - Word (4 Cells)' }, 'templateMeta');
+  });
+
+  runner.check('K-1a U01 P3 onset_rime_blend → T-BLEND with phoneme labels', () => {
+    const r = T(PAGES.blend, {}, 'K-1a_U01', 'K');
+    eq(r.kind, 'legacy', 'kind');
+    eq(r.templateId, 'T-BLEND', 'templateId');
+    eq(r.variant, 'v1', 'variant');
+    eq(r.data.items.length, 2, 'items.length');
+    eq(r.data.items[0].phoneme_labels, ['/c/', '/at/'], 'items[0].phoneme_labels');
+    eq(r.data.items[0].phoneme_audios, ['c.mp3', 'at.mp3'], 'items[0].phoneme_audios');
+    eq(r.data.items[0].image, 'cat.webp', 'items[0].image');
+    eq(r.data.items[0].answer, 'cat', 'items[0].answer');
+    eq(r.data.instruction_text, 'Tap each sound. Blend them together. Write the word.', 'instr from topic-level');
+    eq(r.templateMeta, { templateId: 'T-BLEND', variantNumber: 1, variantName: 'Onset-Rime Blend (2 Rows)' }, 'templateMeta');
+  });
+
+  runner.check('Trace_word guideMode "Half Guide" → mixed scaffolds', () => {
+    const page = JSON.parse(JSON.stringify(PAGES.trace));
+    page.englishLetterTopicList[0].guideMode = 'Half Guide';
+    const r = T(page, {}, 'K-1a_U01', 'K');
+    eq(r.data.cells.map(c => c.scaffold), ['trace','trace','faded','faded'], 'half-guide scaffolds');
+    eq(r.templateMeta.variantNumber, 9, 'variantNumber 9');
   });
 
   runner.check('Unknown matchType → T-MATCH › (unknown matchType: foo)', () => {

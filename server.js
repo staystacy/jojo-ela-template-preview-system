@@ -1,28 +1,29 @@
-/* JOJO ELA Preview — Bitable Mode Server
+/* JOJO ELA Preview — Local JSON server (Phase 3)
  *
- * Express proxy that:
+ * Express server that:
  *   - serves the existing static UI (index.html / app.js / data/* / renderers/* / styles.css)
  *   - mounts 10-Final-Assets at /assets
- *   - exposes /api/units, /api/unit/:code (Bitable via lark-cli, in-memory cached)
+ *   - mounts PAGES_DIR at /data/workbooks (so "Open JSON" link in UI works)
+ *   - exposes /api/units, /api/unit/:code by scanning the local PAGES_DIR
  *   - exposes /api/asset-manifest (boot-time scan of 10-Final-Assets)
+ *
+ * Bitable / lark-cli is no longer used. The historical names (bitable-mode.js,
+ * window.JOJO_BITABLE) are kept for now to minimise churn — a future PR can
+ * rename them.
  */
 
 'use strict';
 
 const express = require('express');
-const { execFile } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
 // ---------- Config ----------
-const PORT               = parseInt(process.env.PORT || '3000', 10);
-const ASSETS_DIR         = process.env.ASSETS_DIR
+const PORT       = parseInt(process.env.PORT || '3000', 10);
+const ASSETS_DIR = process.env.ASSETS_DIR
   || '/Users/stacywang/Desktop/JOJO-Worksheet-Research/10-Final-Assets';
-const BITABLE_BASE_TOKEN = process.env.BITABLE_BASE_TOKEN || 'YSoZbDOKCadq3Ys4c9Gl0FkYgqe';
-const BITABLE_TABLE_ID   = process.env.BITABLE_TABLE_ID   || 'tblRw0GDwu5DXVJG';
-const BITABLE_HOST       = process.env.BITABLE_HOST       || 'feishu.cn';
-const LARK_CLI_BIN       = process.env.LARK_CLI_BIN       || 'lark-cli';
-const CACHE_TTL_MS       = parseInt(process.env.CACHE_TTL_MS || '300000', 10);
+const PAGES_DIR  = process.env.PAGES_DIR
+  || '/Users/stacywang/Desktop/JOJO-Worksheet-Research/03-Preview-Tool/data/workbooks';
 
 // ---------- Boot: scan asset manifest ----------
 function scanAssetManifest() {
@@ -65,77 +66,78 @@ const imageCount = Object.values(assetManifest.words).filter((w) => w.image).len
 const audioCount = Object.values(assetManifest.words).filter((w) => w.audio).length;
 console.log(`[server] asset manifest: ${assetManifest.total} words (${imageCount} with image, ${audioCount} with audio)`);
 
-// ---------- In-memory cache ----------
-let unitsCache = { rows: null, ts: 0 };
-
-function execFileP(bin, args, opts) {
-  return new Promise((resolve, reject) => {
-    execFile(bin, args, opts, (err, stdout, stderr) => {
-      if (err) {
-        err.stdout = stdout;
-        err.stderr = stderr;
-        return reject(err);
-      }
-      resolve({ stdout, stderr });
-    });
-  });
-}
-
-async function fetchAllUnits() {
-  if (unitsCache.rows && Date.now() - unitsCache.ts < CACHE_TTL_MS) {
-    return unitsCache.rows;
+// ---------- Filesystem-backed unit catalog ----------
+function scanWorkbooks() {
+  let workbookDirs = [];
+  try {
+    workbookDirs = fs.readdirSync(PAGES_DIR, { withFileTypes: true })
+      .filter((d) => d.isDirectory())
+      .map((d) => d.name);
+  } catch (e) {
+    throw new Error('PAGES_DIR not readable (' + PAGES_DIR + '): ' + e.message);
   }
 
-  const { stdout } = await execFileP(LARK_CLI_BIN, [
-    'base', '+record-list',
-    '--base-token', BITABLE_BASE_TOKEN,
-    '--table-id',   BITABLE_TABLE_ID,
-    '--limit',      '200'
-  ], {
-    timeout: 25000,
-    maxBuffer: 16 * 1024 * 1024,
-    env: { ...process.env, LARK_CLI_NO_PROXY: '1' }
-  });
-
-  const json = JSON.parse(stdout);
-  if (!json.ok || !json.data) {
-    throw new Error('lark-cli returned ok=false: ' + JSON.stringify(json).slice(0, 200));
+  const units = [];
+  for (const wb of workbookDirs) {
+    const dir = path.join(PAGES_DIR, wb);
+    const byUnit = {};
+    for (const f of fs.readdirSync(dir)) {
+      const m = f.match(/^U(\d+)_P(\d+)\.json$/);
+      if (!m) continue;
+      const key = wb + '_U' + m[1];
+      (byUnit[key] = byUnit[key] || []).push({
+        pageNum: parseInt(m[2], 10),
+        file: f
+      });
+    }
+    for (const code of Object.keys(byUnit)) {
+      const pages = byUnit[code].sort((a, b) => a.pageNum - b.pageNum);
+      units.push({
+        unit_code: code,
+        workbook: wb,
+        page_count: pages.length,
+        files: pages.map((p) => p.file)
+      });
+    }
   }
-
-  const fields = json.data.fields || [];
-  const idx = (name) => fields.indexOf(name);
-  const i_unit_code  = idx('unit_code');
-  const i_workbook   = idx('workbook_ref');
-  const i_status     = idx('status');
-  const i_page_count = idx('unit_page_count');
-  const i_gen        = idx('generator_output');
-  const i_content    = idx('content_pool');
-  const i_title      = idx('unit_title');
-
-  const records  = json.data.data || [];
-  const recordIds = json.data.record_id_list || [];
-
-  // Bitable single-select fields come back as arrays of strings; flatten to scalar
-  const flat = (v) => Array.isArray(v) ? (v.length ? String(v[0]) : null) : v;
-
-  const rows = records.map((row, i) => ({
-    unit_code:     flat(row[i_unit_code])  || null,
-    status:        flat(row[i_status])     || null,
-    workbook:      (flat(row[i_unit_code]) || '').split('_U')[0] || null,
-    page_count:    flat(row[i_page_count]) || 0,
-    unit_title:    flat(row[i_title])      || null,
-    record_id:     recordIds[i]            || null,
-    generator_raw: row[i_gen]              || null,
-    content_raw:   row[i_content]          || null
-  })).filter((r) => r.unit_code);
-
-  unitsCache = { rows, ts: Date.now() };
-  return rows;
+  units.sort((a, b) => a.unit_code.localeCompare(b.unit_code));
+  return units;
 }
 
-function buildRecordUrl(recordId) {
-  if (!recordId) return null;
-  return `https://${BITABLE_HOST}/base/${BITABLE_BASE_TOKEN}?table=${BITABLE_TABLE_ID}&record=${recordId}`;
+function loadUnit(code) {
+  const meta = scanWorkbooks().find((u) => u.unit_code === code);
+  if (!meta) return null;
+  const pages = [];
+  for (const f of meta.files) {
+    const fpath = path.join(PAGES_DIR, meta.workbook, f);
+    try {
+      pages.push(JSON.parse(fs.readFileSync(fpath, 'utf8')));
+    } catch (e) {
+      pages.push({
+        _parseError: e.message,
+        _sourceFile: f,
+        pageNumber: pages.length + 1
+      });
+    }
+  }
+  return {
+    unit_code: meta.unit_code,
+    workbook: meta.workbook,
+    page_count: meta.page_count,
+    pages,
+    source_files: meta.files.map((f) => '/data/workbooks/' + meta.workbook + '/' + f),
+    fetched_at: new Date().toISOString()
+  };
+}
+
+// Try boot-time scan to fail fast if PAGES_DIR is missing
+try {
+  const initial = scanWorkbooks();
+  const wbs = [...new Set(initial.map((u) => u.workbook))];
+  console.log(`[server] pages_dir: ${initial.length} units across ${wbs.length} workbooks (${wbs.join(', ')})`);
+} catch (e) {
+  console.error('[server] FATAL:', e.message);
+  process.exit(1);
 }
 
 // ---------- App ----------
@@ -152,75 +154,40 @@ app.use(express.static(__dirname, { extensions: ['html'] }));
 // Static: final assets
 app.use('/assets', express.static(ASSETS_DIR));
 
+// Static: workbook JSON files (so "Open JSON" link in UI works)
+app.use('/data/workbooks', express.static(PAGES_DIR));
+
 // ---------- API ----------
 app.get('/api/asset-manifest', (_req, res) => {
   res.json(assetManifest);
 });
 
-app.get('/api/units', async (req, res) => {
+app.get('/api/units', (req, res) => {
   try {
-    const rows = await fetchAllUnits();
+    const all = scanWorkbooks();
     const workbookFilter = req.query.workbook;
-    const filtered = workbookFilter ? rows.filter((r) => r.workbook === workbookFilter) : rows;
+    const filtered = workbookFilter ? all.filter((r) => r.workbook === workbookFilter) : all;
+    const workbooks = [...new Set(all.map((u) => u.workbook))].sort();
     res.json({
-      cached: Date.now() - unitsCache.ts < CACHE_TTL_MS,
-      units: filtered
-        .map((r) => ({
-          unit_code:  r.unit_code,
-          workbook:   r.workbook,
-          status:     r.status,
-          page_count: r.page_count,
-          unit_title: r.unit_title,
-          record_id:  r.record_id
-        }))
-        .sort((a, b) => (a.unit_code > b.unit_code ? 1 : -1))
+      workbooks,
+      units: filtered.map((r) => ({
+        unit_code: r.unit_code,
+        workbook: r.workbook,
+        page_count: r.page_count
+      }))
     });
-  } catch (err) {
-    sendLarkError(res, err);
+  } catch (e) {
+    sendFsError(res, e);
   }
 });
 
-app.get('/api/unit/:code', async (req, res) => {
+app.get('/api/unit/:code', (req, res) => {
   try {
-    const rows = await fetchAllUnits();
-    const row = rows.find((r) => r.unit_code === req.params.code);
-    if (!row) return res.status(404).json({ error: 'unit not found: ' + req.params.code });
-
-    let generator;
-    let content;
-    try {
-      generator = JSON.parse(row.generator_raw || 'null');
-    } catch (e) {
-      return res.status(502).json({
-        error: 'generator_output JSON parse failed: ' + e.message,
-        raw_preview: (row.generator_raw || '').slice(0, 300)
-      });
-    }
-    try {
-      content = JSON.parse(row.content_raw || 'null');
-    } catch (e) {
-      return res.status(502).json({
-        error: 'content_pool JSON parse failed: ' + e.message,
-        raw_preview: (row.content_raw || '').slice(0, 300)
-      });
-    }
-
-    const pages = (generator && generator.pages) || [];
-
-    res.json({
-      unit_code:   row.unit_code,
-      workbook:    row.workbook,
-      status:      row.status,
-      page_count:  row.page_count,
-      unit_title:  row.unit_title,
-      record_id:   row.record_id,
-      record_url:  buildRecordUrl(row.record_id),
-      pages,
-      content_pool: content,
-      fetched_at:  new Date(unitsCache.ts).toISOString()
-    });
-  } catch (err) {
-    sendLarkError(res, err);
+    const unit = loadUnit(req.params.code);
+    if (!unit) return res.status(404).json({ error: 'unit not found: ' + req.params.code });
+    res.json(unit);
+  } catch (e) {
+    sendFsError(res, e);
   }
 });
 
@@ -228,19 +195,14 @@ app.get('/test/bitable-mode', (_req, res) => {
   res.redirect('/data/bitable-mode.test.html');
 });
 
-function sendLarkError(res, err) {
-  const code = err.killed ? 504 : 502;
-  const body = { error: 'lark-cli failed: ' + (err.message || '').slice(0, 200) };
-  if (err.stderr) body.stderr_tail = String(err.stderr).slice(-500);
-  if (err.stdout) body.stdout_preview = String(err.stdout).slice(0, 300);
-  console.error('[server] lark-cli error:', body);
-  res.status(code).json(body);
+function sendFsError(res, err) {
+  console.error('[server] fs error:', err);
+  res.status(502).json({ error: err.message || String(err) });
 }
 
 // ---------- Listen ----------
 app.listen(PORT, () => {
   console.log(`[server] listening on http://localhost:${PORT}`);
-  console.log(`[server] base_token=${BITABLE_BASE_TOKEN} table=${BITABLE_TABLE_ID}`);
+  console.log(`[server] pages_dir=${PAGES_DIR}`);
   console.log(`[server] assets_dir=${ASSETS_DIR}`);
-  console.log(`[server] cache_ttl_ms=${CACHE_TTL_MS}`);
 });
