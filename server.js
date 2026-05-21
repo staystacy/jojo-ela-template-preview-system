@@ -56,6 +56,7 @@ function scanAssetManifest() {
   const wordAudioNames        = scanDir(path.join(ASSETS_DIR, 'audio',  'word'),         AUDIO_RE);
   const letterAudioNames      = scanDir(path.join(ASSETS_DIR, 'audio',  'letter'),       AUDIO_RE);
   const rimeAudioNames        = scanDir(path.join(ASSETS_DIR, 'audio',  'rime'),         AUDIO_RE);
+  const phonemeAudioNames     = scanDir(path.join(ASSETS_DIR, 'audio',  'phoneme'),      AUDIO_RE);
   const instructionAudioNames = scanDir(path.join(ASSETS_DIR, 'audio',  'instruction'),  AUDIO_RE);
 
   const words = {};
@@ -69,6 +70,10 @@ function scanAssetManifest() {
   const rimes = {};
   rimeAudioNames.forEach((r) => { rimes[r] = { audio: true }; });
 
+  // Phoneme audio is keyed by semantic ID (onset_k, short_a, digraph_sh, long_a, ...)
+  const phonemes = {};
+  phonemeAudioNames.forEach((p) => { phonemes[p] = { audio: true }; });
+
   // Instruction audio is keyed by slugified source text (matches page JSON's instructionKey)
   const instructions = {};
   instructionAudioNames.forEach((k) => { instructions[k] = { audio: true }; });
@@ -79,6 +84,7 @@ function scanAssetManifest() {
     words,
     letters,
     rimes,
+    phonemes,
     instructions
   };
 }
@@ -140,8 +146,9 @@ function getAssetManifest() {
   const audioCount = Object.values(m.words).filter((w) => w.audio).length;
   const letterCount = Object.keys(m.letters || {}).length;
   const rimeCount = Object.keys(m.rimes || {}).length;
+  const phonemeCount = Object.keys(m.phonemes || {}).length;
   const instructionCount = Object.keys(m.instructions || {}).length;
-  console.log(`[server] asset manifest: ${m.total} words (${imageCount} img, ${audioCount} audio) · ${letterCount} letter · ${rimeCount} rime · ${instructionCount} instruction`);
+  console.log(`[server] asset manifest: ${m.total} words (${imageCount} img, ${audioCount} audio) · ${letterCount} letter · ${rimeCount} rime · ${phonemeCount} phoneme · ${instructionCount} instruction`);
 }
 
 // ---------- Filesystem-backed unit catalog ----------

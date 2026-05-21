@@ -515,6 +515,56 @@
     eq(r.ctx.instructionAudio, 'look_at_the_picture_write_the_word.mp3', 'instructionAudio is filename');
   });
 
+  runner.check('onset_rime_blend uses onset_phoneme_id + rime_id for audio filenames', () => {
+    const page = {
+      pageNumber: 3,
+      instructionText: 'Tap each sound.',
+      instructionKey: 'tap_each_sound_blend_them_together_write_the_word',
+      englishLetterTopicList: [{
+        topicType: 'english_onset_rime_blend',
+        rows: [
+          { word:'cat', imageName:'cat', onset:'c', rime:'at',
+            onset_phoneme_id:'onset_k', rime_id:'at', answer:'cat' },
+          { word:'hat', imageName:'hat', onset:'h', rime:'at',
+            onset_phoneme_id:'onset_h', rime_id:'at', answer:'hat' }
+        ]
+      }]
+    };
+    const r = T(page, {}, 'K-1a_U01', 'K');
+    eq(r.data.items[0].phoneme_audios, ['onset_k.mp3', 'at.mp3'], 'row 0 uses *_id audio filenames');
+    eq(r.data.items[0].phoneme_labels, ['/c/', '/at/'], 'row 0 keeps grapheme labels');
+    eq(r.data.items[1].phoneme_audios, ['onset_h.mp3', 'at.mp3'], 'row 1');
+  });
+
+  runner.check('phoneme_blend_picture uses phoneme_ids when present', () => {
+    const page = {
+      pageNumber: 3,
+      instructionText: 'Listen.',
+      englishLetterTopicList: [{
+        topicType: 'english_phoneme_blend_picture',
+        rows: [
+          { word:'hit', imageName:'hit',
+            phonemes:['h','i','t'], phoneme_ids:['onset_h','short_i','onset_t'], answer:'hit' }
+        ]
+      }]
+    };
+    const r = T(page, {}, 'K-1a_U04', 'K');
+    eq(r.data.items[0].phoneme_audios, ['onset_h.mp3', 'short_i.mp3', 'onset_t.mp3'], 'audio uses phoneme_ids');
+    eq(r.data.items[0].phoneme_labels, ['/h/', '/i/', '/t/'], 'labels keep graphemes');
+  });
+
+  runner.check('phoneme_blend_picture falls back to graphemes when phoneme_ids absent', () => {
+    const page = {
+      pageNumber: 3, instructionText: 'Listen.',
+      englishLetterTopicList: [{
+        topicType: 'english_phoneme_blend_picture',
+        rows: [{ word:'sit', imageName:'sit', phonemes:['s','i','t'], answer:'sit' }]
+      }]
+    };
+    const r = T(page, {}, 'K-1a_U05', 'K');
+    eq(r.data.items[0].phoneme_audios, ['s.mp3', 'i.mp3', 't.mp3'], 'fallback to graphemes');
+  });
+
   runner.check('instructionKey at topic-level falls back when missing on page', () => {
     const page = {
       pageNumber: 99,

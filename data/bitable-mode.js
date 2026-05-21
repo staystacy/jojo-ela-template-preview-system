@@ -97,25 +97,29 @@
     return !!(m[word] && m[word][kind]);
   }
 
-  // Resolve an audio filename (e.g. "cat.mp3", "C.mp3", "at.mp3",
-  // "look_at_the_picture_write_the_word.mp3") into a real URL under the
-  // /assets/audio/{category}/<name>.{ext} layout.
-  // Checks word → letter (uppercase) → rime → instruction; null if missing.
+  // Resolve an audio filename into a real URL.
+  // Lookup order: phoneme (semantic ID like onset_k, short_a, digraph_sh)
+  //               → word → rime → instruction → letter (uppercase letter name).
+  // Phoneme is checked first so that pages passing semantic phoneme IDs
+  // (e.g. "onset_k.mp3") don't fall through to letter-name audio.
   function resolveAudioUrl(name, ext) {
     const M = State.assetManifest;
     ext = ext || 'mp3';
+    if (M.phonemes && M.phonemes[name] && M.phonemes[name].audio) {
+      return '/assets/audio/phoneme/' + name + '.' + ext;
+    }
     if (M.words && M.words[name] && M.words[name].audio) {
       return '/assets/audio/word/' + name + '.' + ext;
-    }
-    const upper = String(name).toUpperCase();
-    if (M.letters && M.letters[upper] && M.letters[upper].audio) {
-      return '/assets/audio/letter/' + upper + '.' + ext;
     }
     if (M.rimes && M.rimes[name] && M.rimes[name].audio) {
       return '/assets/audio/rime/' + name + '.' + ext;
     }
     if (M.instructions && M.instructions[name] && M.instructions[name].audio) {
       return '/assets/audio/instruction/' + name + '.' + ext;
+    }
+    const upper = String(name).toUpperCase();
+    if (M.letters && M.letters[upper] && M.letters[upper].audio) {
+      return '/assets/audio/letter/' + upper + '.' + ext;
     }
     return null;
   }
@@ -277,8 +281,14 @@
         instruction_text: ctx.instructionText,
         instruction_audio: ctx.instructionAudio,
         cell_size: 56,
+        // Audio: prefer semantic IDs (onset_k.mp3, at.mp3) over graphemes (c.mp3, at.mp3).
+        // Falling back to grapheme makes the resolver pick letter-name audio (C = "see"),
+        // not the phoneme /k/, so always use *_id when JSON provides it.
         items: rows.map((r) => ({
-          phoneme_audios: [r.onset + '.mp3', r.rime + '.mp3'],
+          phoneme_audios: [
+            (r.onset_phoneme_id || r.onset) + '.mp3',
+            (r.rime_id          || r.rime ) + '.mp3'
+          ],
           phoneme_labels: ['/' + r.onset + '/', '/' + r.rime + '/'],
           image: (r.imageName || r.word) + '.webp',
           answer: r.answer || r.word
@@ -306,12 +316,20 @@
         instruction_text: ctx.instructionText,
         instruction_audio: ctx.instructionAudio,
         cell_size: 48,
-        items: rows.map((r) => ({
-          phoneme_audios: (r.phonemes || []).map((p) => p + '.mp3'),
-          phoneme_labels: (r.phonemes || []).map((p) => '/' + p + '/'),
-          image: (r.imageName || r.word) + '.webp',
-          answer: r.answer || r.word
-        }))
+        // Prefer semantic phoneme IDs ("onset_h.mp3", "short_i.mp3") over single-letter
+        // graphemes ("h.mp3" → letter-name audio "aitch"). Falls back to grapheme if
+        // the page predates phoneme_ids generation.
+        items: rows.map((r) => {
+          const ids = (Array.isArray(r.phoneme_ids) && r.phoneme_ids.length === (r.phonemes || []).length)
+            ? r.phoneme_ids
+            : (r.phonemes || []);
+          return {
+            phoneme_audios: ids.map((p) => p + '.mp3'),
+            phoneme_labels: (r.phonemes || []).map((p) => '/' + p + '/'),
+            image: (r.imageName || r.word) + '.webp',
+            answer: r.answer || r.word
+          };
+        })
       }
     };
   }
@@ -1013,8 +1031,10 @@
       }
     });
 
-    // Audio buttons → resolveAudioUrl handles word/letter/rime/instruction in one pass.
-    container.querySelectorAll('.ws-audio-btn').forEach((btn) => {
+    // Audio + phoneme buttons → resolveAudioUrl handles all categories in one pass.
+    // T-BLEND uses R.phonemeButton (class .ws-phoneme-btn); everything else uses
+    // R.audioButton (class .ws-audio-btn). Both put filename in `title=Audio: …`.
+    container.querySelectorAll('.ws-audio-btn, .ws-phoneme-btn').forEach((btn) => {
       const title = btn.getAttribute('title') || '';
       const m = title.match(/Audio:\s*([^.\s]+)\.(mp3|wav|m4a)$/i);
       if (!m) return;
