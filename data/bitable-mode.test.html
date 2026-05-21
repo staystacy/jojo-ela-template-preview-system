@@ -222,7 +222,7 @@
     eq(r.templateId, 'T-SOUNDBOX', 'templateId');
     eq(r.variant, 'v2', 'variant');
     eq(r.data.instruction_text, 'Listen to the word. Write each sound in a box.', 'instr text');
-    eq(r.data.instruction_audio, '/assets/audio/instruction/K-1_U01_p1.mp3', 'instr audio');
+    eq(r.data.instruction_audio, null, 'instr audio is null when no instructionKey in fixture');
     eq(r.data.items.length, 4, 'items.length');
     eq(r.data.items[0].image, 'cat.webp', 'item[0].image');
     eq(r.data.items[0].audio, 'cat.mp3', 'item[0].audio');
@@ -362,6 +362,14 @@
   runner.check('Page 4 templateMeta picture_to_word → T-MATCH › Match Picture to Word (4 Pairs)', () => {
     const r = T(PAGES.p4, {}, 'K-1_U01', 'K');
     eq(r.templateMeta, { templateId: 'T-MATCH', variantNumber: 2, variantName: 'Match Picture to Word (4 Pairs)' }, 'templateMeta');
+  });
+
+  runner.check('instructionKey → audio filename = "<key>.mp3" (Bitable Resource Library alignment)', () => {
+    const r = T(PAGES.blend, {}, 'K-1a_U01', 'K');
+    // PAGES.blend's topic carries instructionKey="tap_each_sound_blend_them_together_write_the_word"
+    eq(r.data.instruction_audio,
+       'tap_each_sound_blend_them_together_write_the_word.mp3',
+       'instruction_audio is just <key>.mp3 (fallback layer adds /assets/audio/instruction/ prefix)');
   });
 
   runner.check('letter_case match → text on BOTH sides (no images)', () => {

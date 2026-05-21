@@ -52,10 +52,11 @@ function scanAssetManifest() {
   const IMG_RE   = /^([^.]+)\.(webp|png|jpg|jpeg)$/i;
   const AUDIO_RE = /^([^.]+)\.(mp3|wav|m4a)$/i;
 
-  const wordImageNames    = scanDir(path.join(ASSETS_DIR, 'images', 'word'),   IMG_RE);
-  const wordAudioNames    = scanDir(path.join(ASSETS_DIR, 'audio',  'word'),   AUDIO_RE);
-  const letterAudioNames  = scanDir(path.join(ASSETS_DIR, 'audio',  'letter'), AUDIO_RE);
-  const rimeAudioNames    = scanDir(path.join(ASSETS_DIR, 'audio',  'rime'),   AUDIO_RE);
+  const wordImageNames        = scanDir(path.join(ASSETS_DIR, 'images', 'word'),         IMG_RE);
+  const wordAudioNames        = scanDir(path.join(ASSETS_DIR, 'audio',  'word'),         AUDIO_RE);
+  const letterAudioNames      = scanDir(path.join(ASSETS_DIR, 'audio',  'letter'),       AUDIO_RE);
+  const rimeAudioNames        = scanDir(path.join(ASSETS_DIR, 'audio',  'rime'),         AUDIO_RE);
+  const instructionAudioNames = scanDir(path.join(ASSETS_DIR, 'audio',  'instruction'),  AUDIO_RE);
 
   const words = {};
   function ensure(w) { if (!words[w]) words[w] = { image: false, audio: false }; return words[w]; }
@@ -68,12 +69,17 @@ function scanAssetManifest() {
   const rimes = {};
   rimeAudioNames.forEach((r) => { rimes[r] = { audio: true }; });
 
+  // Instruction audio is keyed by slugified source text (matches page JSON's instructionKey)
+  const instructions = {};
+  instructionAudioNames.forEach((k) => { instructions[k] = { audio: true }; });
+
   return {
     generated_at: new Date().toISOString(),
     total: Object.keys(words).length,
     words,
     letters,
-    rimes
+    rimes,
+    instructions
   };
 }
 
@@ -123,7 +129,8 @@ const imageCount = Object.values(assetManifest.words).filter((w) => w.image).len
 const audioCount = Object.values(assetManifest.words).filter((w) => w.audio).length;
 const letterCount = Object.keys(assetManifest.letters || {}).length;
 const rimeCount = Object.keys(assetManifest.rimes || {}).length;
-console.log(`[server] asset manifest: ${assetManifest.total} words (${imageCount} img, ${audioCount} audio) · ${letterCount} letter audios · ${rimeCount} rime audios`);
+const instructionCount = Object.keys(assetManifest.instructions || {}).length;
+console.log(`[server] asset manifest: ${assetManifest.total} words (${imageCount} img, ${audioCount} audio) · ${letterCount} letter · ${rimeCount} rime · ${instructionCount} instruction`);
 
 // ---------- Filesystem-backed unit catalog ----------
 function scanWorkbooks() {
