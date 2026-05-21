@@ -25,7 +25,7 @@ const ASSETS_DIR = process.env.ASSETS_DIR
 const PAGES_DIR  = process.env.PAGES_DIR
   || '/Users/stacywang/Desktop/JOJO-Worksheet-Research/03-Preview-Tool/data/workbooks';
 const NAMING_CSV = process.env.NAMING_CSV
-  || '/Users/stacywang/Desktop/JOJO-Worksheet-Research/Framework/QA1-output/naming.csv';
+  || '/Users/stacywang/Desktop/JOJO-Worksheet-Research/Framework/assets/naming.csv';
 
 // ---------- Boot: scan asset manifest ----------
 function scanAssetManifest() {
