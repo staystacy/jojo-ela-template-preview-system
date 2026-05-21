@@ -49,10 +49,32 @@ src/                  # Preview tool source code (TBD)
 - JSON 標準參考 `Framework/ELA-Template-json-260518.html`
 
 ### 啟動
+
+**前景（適合臨時起、Ctrl-C 結束）：**
 ```bash
 npm install
 node server.js   # 預設 :3000
 ```
+
+**Detached（terminal 關掉、Claude session 結束都還在跑）：**
+```bash
+./scripts/preview-start.sh   # 啟動，PID 寫進 .run/server.pid
+./scripts/preview-status.sh  # 看狀態
+./scripts/preview-stop.sh    # 停止
+# log → .run/server.log
+```
+
+**開機自動啟動（launchd，永久跑、crash 自動重啟）：**
+```bash
+cp scripts/com.jojo.preview.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.jojo.preview.plist
+# 日後每次登入自動拉起。改 server.js 後要 reload：
+launchctl unload ~/Library/LaunchAgents/com.jojo.preview.plist
+launchctl load   ~/Library/LaunchAgents/com.jojo.preview.plist
+# 移除：rm ~/Library/LaunchAgents/com.jojo.preview.plist
+# log: tail -f /tmp/jojo-preview.log /tmp/jojo-preview.err
+```
+
 瀏覽器開 [http://localhost:3000](http://localhost:3000)，header 切到 **Bitable Mode**（歷史名稱，現在讀本地 JSON）。
 
 ### 環境變數（可選）
