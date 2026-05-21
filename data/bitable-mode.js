@@ -97,6 +97,35 @@
     return !!(m[word] && m[word][kind]);
   }
 
+  // Resolve an audio filename (e.g. "cat.mp3", "C.mp3", "at.mp3") into a real
+  // URL under the new /assets/audio/{category}/<name>.{ext} layout.
+  // Checks word → letter (uppercase) → rime, returns null if not found anywhere.
+  function resolveAudioUrl(name, ext) {
+    const M = State.assetManifest;
+    ext = ext || 'mp3';
+    if (M.words && M.words[name] && M.words[name].audio) {
+      return '/assets/audio/word/' + name + '.' + ext;
+    }
+    const upper = String(name).toUpperCase();
+    if (M.letters && M.letters[upper] && M.letters[upper].audio) {
+      return '/assets/audio/letter/' + upper + '.' + ext;
+    }
+    if (M.rimes && M.rimes[name] && M.rimes[name].audio) {
+      return '/assets/audio/rime/' + name + '.' + ext;
+    }
+    return null;
+  }
+
+  // Word images live under /assets/images/word/<word>.<ext>
+  function resolveImageUrl(word, ext) {
+    const M = State.assetManifest;
+    ext = ext || 'webp';
+    if (M.words && M.words[word] && M.words[word].image) {
+      return '/assets/images/word/' + word + '.' + ext;
+    }
+    return null;
+  }
+
   // ============ Topic translators ============
 
   function translateSoundBoxFull(topics, ctx) {
@@ -346,13 +375,16 @@
     }
     const topMap = Object.fromEntries(t.topItems.map((x) => [x.id, x.value]));
     const botMap = Object.fromEntries(t.bottomItems.map((x) => [x.id, x.value]));
+    const matchType = t.matchType || 'picture_to_word';
+    const leftIsImage = matchType === 'picture_to_word';
     const pairs = t.correctPairs.map((pairStr) => {
       const [topId, botId] = String(pairStr).split('-');
-      const word = topMap[topId];
-      return {
-        left:  { content: word + '.webp', type: 'image', audio: word + '.mp3' },
-        right: { content: botMap[botId], type: 'word' }
-      };
+      const leftValue = topMap[topId];
+      const rightValue = botMap[botId];
+      const left = leftIsImage
+        ? { content: leftValue + '.webp', type: 'image', audio: leftValue + '.mp3' }
+        : { content: leftValue, type: 'word', audio: leftValue + '.mp3' };
+      return { left, right: { content: rightValue, type: 'word' } };
     });
     return {
       kind: 'legacy',
@@ -747,7 +779,7 @@
     const instructionTextRaw = pageInstr || topicInstr;
     const instructionText = instructionTextRaw || defaultInstr || (page && page.instructionId) || '(no instruction)';
     const instructionFallback = !instructionTextRaw && !defaultInstr && !!(page && page.instructionId);
-    const instructionAudio = '/assets/audio/instr/' + unitCode + '_p' + (page && page.pageNumber) + '.mp3';
+    const instructionAudio = '/assets/audio/instruction/' + unitCode + '_p' + (page && page.pageNumber) + '.mp3';
 
     const ctx = {
       pageId: page.pageId || (unitCode + '_p' + page.pageNumber),
@@ -952,8 +984,7 @@
   // ============ Asset fallback + audio playback wiring ============
 
   function applyAssetFallbacks(container) {
-    // Image placeholders: parse filename from inner <span>, swap to real <img> if asset present,
-    // otherwise enhance with warning text.
+    // Image placeholders → swap to real <img> using resolveImageUrl, else enhance with warning.
     container.querySelectorAll('.ws-image-placeholder').forEach((ph) => {
       const span = ph.querySelector('span');
       const filename = span ? span.textContent.trim() : '';
@@ -961,40 +992,37 @@
       if (!m) return;
       const word = m[1];
       const ext  = m[2].toLowerCase();
-      if (hasAsset(word, 'image')) {
-        replaceWithRealImg(ph, word, ext);
+      const url  = resolveImageUrl(word, ext);
+      if (url) {
+        replaceWithRealImg(ph, word, url);
       } else {
         enhanceMissingPlaceholder(ph, word, filename);
       }
     });
 
-    // Audio buttons: parse "Audio: cat.mp3" out of title; if asset missing -> disable;
-    // if present -> attach onclick to play /assets/audio/<file>.
+    // Audio buttons → resolve under word/letter/rime category, wire click; else disable.
     container.querySelectorAll('.ws-audio-btn').forEach((btn) => {
       const title = btn.getAttribute('title') || '';
       const m = title.match(/Audio:\s*([^.\s]+)\.(mp3|wav|m4a)$/i);
       if (!m) return;
-      const word = m[1];
+      const name = m[1];
       const ext  = m[2].toLowerCase();
-      // Instruction audio (path inside ctx.instructionAudio starts with '/assets/audio/instr/')
-      // — those won't match this regex (the word will be K-1_U01_p1 etc.), so they fall through
-      // and we treat the underscore-prefixed audio as missing without manifest entries.
       const inInstruction = !!btn.closest('.ws-instruction');
-      const present = !inInstruction && hasAsset(word, 'audio');
-      if (present) {
-        btn.dataset.audioSrc = '/assets/audio/' + word + '.' + ext;
+      const url = inInstruction ? null : resolveAudioUrl(name, ext);
+      if (url) {
+        btn.dataset.audioSrc = url;
         wireAudioPlayback(btn);
       } else {
         btn.disabled = true;
         btn.classList.add('ws-bitable-audio-missing');
-        btn.title = '⚠ Missing audio: ' + word + '.' + ext + (inInstruction ? ' (instruction audio not produced yet)' : '');
+        btn.title = '⚠ Missing audio: ' + name + '.' + ext + (inInstruction ? ' (instruction audio not produced yet)' : '');
       }
     });
   }
 
-  function replaceWithRealImg(placeholderEl, word, ext) {
+  function replaceWithRealImg(placeholderEl, word, url) {
     const img = document.createElement('img');
-    img.src = '/assets/images/' + word + '.' + ext;
+    img.src = url;
     img.alt = word;
     const widthAttr  = placeholderEl.style.width;
     const heightAttr = placeholderEl.style.height;
@@ -1007,7 +1035,10 @@
     const fieldName = placeholderEl.getAttribute('data-field');
     if (fieldName) img.setAttribute('data-field', fieldName);
     // Defensive: if image fails to load despite manifest claim, fall back to placeholder
-    img.onerror = () => enhanceMissingPlaceholder(placeholderEl, word, word + '.' + ext);
+    img.onerror = () => {
+      const fallbackName = url.split('/').pop() || word + '.webp';
+      enhanceMissingPlaceholder(placeholderEl, word, fallbackName);
+    };
     placeholderEl.replaceWith(img);
   }
 

@@ -222,7 +222,7 @@
     eq(r.templateId, 'T-SOUNDBOX', 'templateId');
     eq(r.variant, 'v2', 'variant');
     eq(r.data.instruction_text, 'Listen to the word. Write each sound in a box.', 'instr text');
-    eq(r.data.instruction_audio, '/assets/audio/instr/K-1_U01_p1.mp3', 'instr audio');
+    eq(r.data.instruction_audio, '/assets/audio/instruction/K-1_U01_p1.mp3', 'instr audio');
     eq(r.data.items.length, 4, 'items.length');
     eq(r.data.items[0].image, 'cat.webp', 'item[0].image');
     eq(r.data.items[0].audio, 'cat.mp3', 'item[0].audio');
@@ -362,6 +362,27 @@
   runner.check('Page 4 templateMeta picture_to_word → T-MATCH › Match Picture to Word (4 Pairs)', () => {
     const r = T(PAGES.p4, {}, 'K-1_U01', 'K');
     eq(r.templateMeta, { templateId: 'T-MATCH', variantNumber: 2, variantName: 'Match Picture to Word (4 Pairs)' }, 'templateMeta');
+  });
+
+  runner.check('letter_case match → text on BOTH sides (no images)', () => {
+    const page = {
+      pageNumber: 99, instructionText: 'Find its matching form.',
+      englishLetterTopicList: [{
+        topicType: 'english_matching',
+        matchType: 'letter_case',
+        topItems:    [{id:'t1',value:'D'},{id:'t2',value:'E'},{id:'t3',value:'F'},{id:'t4',value:'A'}],
+        bottomItems: [{id:'b1',value:'f'},{id:'b2',value:'a'},{id:'b3',value:'d'},{id:'b4',value:'e'}],
+        correctPairs: ['t1-b3','t2-b4','t3-b1','t4-b2']
+      }]
+    };
+    const r = T(page, {}, 'PK-1a_U02', 'PreK');
+    eq(r.kind, 'legacy', 'kind');
+    eq(r.data.pairs.length, 4, 'pairs.length');
+    eq(r.data.pairs[0].left.type,  'word', 'left.type for letter_case');
+    eq(r.data.pairs[0].left.content, 'D',  'left.content stays as letter');
+    eq(r.data.pairs[0].right.type, 'word', 'right.type');
+    eq(r.data.pairs[0].right.content, 'd', 'right.content');
+    eq(r.templateMeta.variantName, 'Match Letter Case (4 Pairs)', 'variant');
   });
 
   runner.check('Page 5 templateMeta → T-SOUNDBOX › Sound Box - Partial Fill (4 Rows, 2x2)', () => {

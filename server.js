@@ -28,38 +28,52 @@ const NAMING_CSV = process.env.NAMING_CSV
   || '/Users/stacywang/Desktop/JOJO-Worksheet-Research/Framework/assets/naming.csv';
 
 // ---------- Boot: scan asset manifest ----------
+// New layout (May 2026): 10-Final-Assets/
+//   images/word/<word>.webp        — word images
+//   images/scene/<name>.webp       — scene images (future)
+//   audio/word/<word>.mp3          — word TTS
+//   audio/letter/<UPPER>.mp3       — single letter sound
+//   audio/rime/<rime>.mp3          — rime sound (-at, -an, …)
+//   audio/instruction/<id>.mp3     — instruction TTS (future)
+//   audio/phoneme/<x>.mp3          — phoneme sound (future)
+//   audio/sfx/<name>.mp3           — sound effects
+function scanDir(dir, extRegex) {
+  try {
+    return fs.readdirSync(dir).map((f) => {
+      const m = f.match(extRegex);
+      return m ? m[1] : null;
+    }).filter(Boolean);
+  } catch (e) {
+    return [];
+  }
+}
+
 function scanAssetManifest() {
-  const imagesDir = path.join(ASSETS_DIR, 'images');
-  const audioDir  = path.join(ASSETS_DIR, 'audio');
+  const IMG_RE   = /^([^.]+)\.(webp|png|jpg|jpeg)$/i;
+  const AUDIO_RE = /^([^.]+)\.(mp3|wav|m4a)$/i;
+
+  const wordImageNames    = scanDir(path.join(ASSETS_DIR, 'images', 'word'),   IMG_RE);
+  const wordAudioNames    = scanDir(path.join(ASSETS_DIR, 'audio',  'word'),   AUDIO_RE);
+  const letterAudioNames  = scanDir(path.join(ASSETS_DIR, 'audio',  'letter'), AUDIO_RE);
+  const rimeAudioNames    = scanDir(path.join(ASSETS_DIR, 'audio',  'rime'),   AUDIO_RE);
+
   const words = {};
+  function ensure(w) { if (!words[w]) words[w] = { image: false, audio: false }; return words[w]; }
+  wordImageNames.forEach((w) => { ensure(w).image = true; });
+  wordAudioNames.forEach((w) => { ensure(w).audio = true; });
 
-  function addWord(word, kind) {
-    if (!words[word]) words[word] = { image: false, audio: false };
-    words[word][kind] = true;
-  }
+  const letters = {};
+  letterAudioNames.forEach((l) => { letters[l] = { audio: true }; });
 
-  try {
-    fs.readdirSync(imagesDir).forEach((f) => {
-      const m = f.match(/^([^.]+)\.(webp|png|jpg|jpeg)$/i);
-      if (m) addWord(m[1], 'image');
-    });
-  } catch (e) {
-    console.warn('[server] images dir not readable:', imagesDir, e.message);
-  }
-
-  try {
-    fs.readdirSync(audioDir).forEach((f) => {
-      const m = f.match(/^([^.]+)\.(mp3|wav|m4a)$/i);
-      if (m) addWord(m[1], 'audio');
-    });
-  } catch (e) {
-    console.warn('[server] audio dir not readable:', audioDir, e.message);
-  }
+  const rimes = {};
+  rimeAudioNames.forEach((r) => { rimes[r] = { audio: true }; });
 
   return {
     generated_at: new Date().toISOString(),
     total: Object.keys(words).length,
-    words
+    words,
+    letters,
+    rimes
   };
 }
 
@@ -107,7 +121,9 @@ console.log(`[server] naming.csv: ${Object.keys(workbookTitles).length} workbook
 const assetManifest = scanAssetManifest();
 const imageCount = Object.values(assetManifest.words).filter((w) => w.image).length;
 const audioCount = Object.values(assetManifest.words).filter((w) => w.audio).length;
-console.log(`[server] asset manifest: ${assetManifest.total} words (${imageCount} with image, ${audioCount} with audio)`);
+const letterCount = Object.keys(assetManifest.letters || {}).length;
+const rimeCount = Object.keys(assetManifest.rimes || {}).length;
+console.log(`[server] asset manifest: ${assetManifest.total} words (${imageCount} img, ${audioCount} audio) · ${letterCount} letter audios · ${rimeCount} rime audios`);
 
 // ---------- Filesystem-backed unit catalog ----------
 function scanWorkbooks() {
