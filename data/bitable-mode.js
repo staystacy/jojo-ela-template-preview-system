@@ -97,9 +97,10 @@
     return !!(m[word] && m[word][kind]);
   }
 
-  // Resolve an audio filename (e.g. "cat.mp3", "C.mp3", "at.mp3") into a real
-  // URL under the new /assets/audio/{category}/<name>.{ext} layout.
-  // Checks word → letter (uppercase) → rime, returns null if not found anywhere.
+  // Resolve an audio filename (e.g. "cat.mp3", "C.mp3", "at.mp3",
+  // "look_at_the_picture_write_the_word.mp3") into a real URL under the
+  // /assets/audio/{category}/<name>.{ext} layout.
+  // Checks word → letter (uppercase) → rime → instruction; null if missing.
   function resolveAudioUrl(name, ext) {
     const M = State.assetManifest;
     ext = ext || 'mp3';
@@ -112,6 +113,9 @@
     }
     if (M.rimes && M.rimes[name] && M.rimes[name].audio) {
       return '/assets/audio/rime/' + name + '.' + ext;
+    }
+    if (M.instructions && M.instructions[name] && M.instructions[name].audio) {
+      return '/assets/audio/instruction/' + name + '.' + ext;
     }
     return null;
   }
@@ -1009,30 +1013,22 @@
       }
     });
 
-    // Audio buttons → resolve under word/letter/rime (or instruction context), wire click; else disable.
+    // Audio buttons → resolveAudioUrl handles word/letter/rime/instruction in one pass.
     container.querySelectorAll('.ws-audio-btn').forEach((btn) => {
       const title = btn.getAttribute('title') || '';
       const m = title.match(/Audio:\s*([^.\s]+)\.(mp3|wav|m4a)$/i);
       if (!m) return;
       const name = m[1];
       const ext  = m[2].toLowerCase();
-      const inInstruction = !!btn.closest('.ws-instruction');
-      let url;
-      if (inInstruction) {
-        const M = State.assetManifest;
-        url = (M.instructions && M.instructions[name] && M.instructions[name].audio)
-          ? '/assets/audio/instruction/' + name + '.' + ext
-          : null;
-      } else {
-        url = resolveAudioUrl(name, ext);
-      }
+      const url  = resolveAudioUrl(name, ext);
       if (url) {
         btn.dataset.audioSrc = url;
         wireAudioPlayback(btn);
       } else {
         btn.disabled = true;
         btn.classList.add('ws-bitable-audio-missing');
-        btn.title = '⚠ Missing audio: ' + name + '.' + ext + (inInstruction ? ' (instruction TTS not generated yet)' : '');
+        const inInstruction = !!btn.closest('.ws-instruction');
+        btn.title = '⚠ Missing audio: ' + name + '.' + ext + (inInstruction ? ' (instruction TTS)' : '');
       }
     });
   }

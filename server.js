@@ -124,13 +124,25 @@ function parseCsvLine(line) {
 const workbookTitles = readNamingCsv();
 console.log(`[server] naming.csv: ${Object.keys(workbookTitles).length} workbook titles loaded`);
 
-const assetManifest = scanAssetManifest();
-const imageCount = Object.values(assetManifest.words).filter((w) => w.image).length;
-const audioCount = Object.values(assetManifest.words).filter((w) => w.audio).length;
-const letterCount = Object.keys(assetManifest.letters || {}).length;
-const rimeCount = Object.keys(assetManifest.rimes || {}).length;
-const instructionCount = Object.keys(assetManifest.instructions || {}).length;
-console.log(`[server] asset manifest: ${assetManifest.total} words (${imageCount} img, ${audioCount} audio) · ${letterCount} letter · ${rimeCount} rime · ${instructionCount} instruction`);
+// Per-request manifest with 5s TTL — lets users add files without restarting server.
+const manifestCache = { ts: 0, data: null };
+function getAssetManifest() {
+  if (manifestCache.data && Date.now() - manifestCache.ts < 5000) return manifestCache.data;
+  manifestCache.data = scanAssetManifest();
+  manifestCache.ts = Date.now();
+  return manifestCache.data;
+}
+
+// Boot log (also primes the cache).
+{
+  const m = getAssetManifest();
+  const imageCount = Object.values(m.words).filter((w) => w.image).length;
+  const audioCount = Object.values(m.words).filter((w) => w.audio).length;
+  const letterCount = Object.keys(m.letters || {}).length;
+  const rimeCount = Object.keys(m.rimes || {}).length;
+  const instructionCount = Object.keys(m.instructions || {}).length;
+  console.log(`[server] asset manifest: ${m.total} words (${imageCount} img, ${audioCount} audio) · ${letterCount} letter · ${rimeCount} rime · ${instructionCount} instruction`);
+}
 
 // ---------- Filesystem-backed unit catalog ----------
 function scanWorkbooks() {
@@ -225,7 +237,7 @@ app.use('/data/workbooks', express.static(PAGES_DIR));
 
 // ---------- API ----------
 app.get('/api/asset-manifest', (_req, res) => {
-  res.json(assetManifest);
+  res.json(getAssetManifest());
 });
 
 app.get('/api/units', (req, res) => {

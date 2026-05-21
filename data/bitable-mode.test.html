@@ -502,6 +502,36 @@
     assert(/unknown matchType: foo/.test(r.templateMeta.variantName), 'variantName mentions unknown');
   });
 
+  runner.check('instructionKey at page-root → ctx.instructionAudio = "<key>.mp3"', () => {
+    const page = {
+      pageNumber: 99,
+      instructionText: 'Look at the picture. Write the word.',
+      instructionKey: 'look_at_the_picture_write_the_word',
+      englishLetterTopicList: [
+        { topicType: 'english_picture_spelling', word: 'cat', answer: 'cat' }
+      ]
+    };
+    const r = T(page, {}, 'K-1a_U01', 'K');
+    eq(r.ctx.instructionAudio, 'look_at_the_picture_write_the_word.mp3', 'instructionAudio is filename');
+  });
+
+  runner.check('instructionKey at topic-level falls back when missing on page', () => {
+    const page = {
+      pageNumber: 99,
+      instructionText: 'Pick a word.',
+      englishLetterTopicList: [
+        {
+          topicType: 'english_word_bank_cloze',
+          instructionKey: 'pick_a_word_from_the_word_bank_write_it_in_the_blank',
+          wordBank: [{ text: 'cat' }],
+          rows: [{ sentence: 'I see a ___.', answer: 'cat' }]
+        }
+      ]
+    };
+    const r = T(page, {}, 'K-1a_U02', 'K');
+    eq(r.ctx.instructionAudio, 'pick_a_word_from_the_word_bank_write_it_in_the_blank.mp3', 'falls back to topic-level key');
+  });
+
   runner.done();
   </script>
 </body>
