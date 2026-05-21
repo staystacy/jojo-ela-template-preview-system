@@ -374,6 +374,232 @@
     };
   }
 
+  function translateCircleWord(topics, ctx) {
+    const t = topics[0];
+    if (!t || !Array.isArray(t.options)) {
+      throw new Error('circle_word topic missing options');
+    }
+    const target = t.targetWord;
+    return {
+      kind: 'legacy',
+      templateId: 'T-CIRCLE',
+      variant: 'v3',
+      sourceTraces: null,
+      data: {
+        page_id: ctx.pageId,
+        template_id: 'T-CIRCLE',
+        variant: 'v3',
+        grade: ctx.grade,
+        instruction: ctx.instructionText,
+        instruction_audio: ctx.instructionAudio,
+        select_mode: 'multi',
+        target_word: target,
+        options: t.options.map((w) => ({
+          content: w,
+          type: 'word',
+          correct: w === target
+        }))
+      }
+    };
+  }
+
+  function translateSortWords(topics, ctx) {
+    const t = topics[0];
+    if (!t || !Array.isArray(t.cardGroups)) {
+      throw new Error('sort_words topic missing cardGroups');
+    }
+    return {
+      kind: 'legacy',
+      templateId: 'T-SORT',
+      variant: 'v2',
+      sourceTraces: null,
+      data: {
+        page_id: ctx.pageId,
+        template_id: 'T-SORT',
+        variant: 'v2',
+        grade: ctx.grade,
+        instruction_text: ctx.instructionText,
+        instruction_audio: ctx.instructionAudio,
+        buckets: t.cardGroups.map((g, i) => ({
+          label: g.category || ('Group ' + (i + 1)),
+          id: 'b' + i
+        })),
+        cards: t.cardGroups.flatMap((g, i) =>
+          (g.cards || []).map((c) => ({
+            content: String(c),
+            type: 'word',
+            correct_bucket: 'b' + i
+          }))
+        )
+      }
+    };
+  }
+
+  function translateSequence(topics, ctx) {
+    const t = topics[0];
+    if (!t || !Array.isArray(t.cards)) {
+      throw new Error('sequence topic missing cards');
+    }
+    const cards = t.cards.slice().sort((a, b) => (a.cardOrder || 0) - (b.cardOrder || 0));
+    const isText = t.cardDisplay === 'sentence' || t.cardDisplay === 'text';
+    // Deterministic scrambled display: reverse order
+    const displayOrder = cards.map((_, i) => cards.length - 1 - i + 1);
+    return {
+      kind: 'legacy',
+      templateId: 'T-SEQUENCE',
+      variant: isText ? 'v2' : 'v1',
+      sourceTraces: null,
+      data: {
+        page_id: ctx.pageId,
+        template_id: 'T-SEQUENCE',
+        variant: isText ? 'v2' : 'v1',
+        grade: ctx.grade,
+        instruction_text: ctx.instructionText,
+        instruction_audio: ctx.instructionAudio,
+        items: cards.map((c) => ({
+          content: c.cardKey,
+          type: isText ? 'text' : 'word',
+          order: c.cardOrder
+        })),
+        display_order: displayOrder
+      }
+    };
+  }
+
+  function translateTraceLetter(topics, ctx) {
+    const t = topics[0];
+    if (!t || !t.letter) {
+      throw new Error('trace_letter topic missing letter');
+    }
+    const letter = t.letter;
+    const isUpper = /^[A-Z]$/.test(letter);
+    const variant = isUpper ? 'v1' : 'v2';
+    return {
+      kind: 'legacy',
+      templateId: 'T-TRACE',
+      variant: variant,
+      sourceTraces: null,
+      data: {
+        page_id: ctx.pageId,
+        template_id: 'T-TRACE',
+        variant: variant,
+        grade: ctx.grade,
+        instruction_text: ctx.instructionText,
+        instruction_audio: ctx.instructionAudio,
+        cell_size: 56,
+        demo_area: {
+          content: letter,
+          animation: 'stroke_order',
+          audio: letter.toLowerCase() + '.mp3',
+          image: t.word ? t.word + '.webp' : null,
+          word: t.word || null
+        },
+        cells: [
+          { scaffold: 'trace', content: letter },
+          { scaffold: 'trace', content: letter },
+          { scaffold: 'faded', content: letter },
+          { scaffold: 'faded', content: letter },
+          { scaffold: 'blank', content: letter },
+          { scaffold: 'blank', content: letter },
+          { scaffold: 'blank', content: letter },
+          { scaffold: 'blank', content: letter }
+        ]
+      }
+    };
+  }
+
+  function translateShadowWriting(topics, ctx) {
+    const t = topics[0];
+    if (!t || !t.letter) {
+      throw new Error('shadow_writing topic missing letter');
+    }
+    const letter = t.letter;
+    const isUpper = /^[A-Z]$/.test(letter);
+    const variant = isUpper ? 'v3' : 'v4';
+    return {
+      kind: 'legacy',
+      templateId: 'T-TRACE',
+      variant: variant,
+      sourceTraces: null,
+      data: {
+        page_id: ctx.pageId,
+        template_id: 'T-TRACE',
+        variant: variant,
+        grade: ctx.grade,
+        instruction_text: ctx.instructionText,
+        instruction_audio: ctx.instructionAudio,
+        cell_size: 48,
+        demo_area: {
+          content: letter,
+          animation: 'stroke_order',
+          audio: letter.toLowerCase() + '.mp3',
+          image: null,
+          word: (t.wordList && t.wordList[0]) || null
+        },
+        cells: Array.from({ length: 10 }, () => ({ scaffold: 'faded', content: letter }))
+      }
+    };
+  }
+
+  function translateWordTransformPicture(topics, ctx) {
+    const t = topics[0];
+    if (!t || !Array.isArray(t.transformations)) {
+      throw new Error('word_transform_picture topic missing transformations');
+    }
+    return {
+      kind: 'legacy',
+      templateId: 'T-TRANSFORM',
+      variant: 'v1',
+      sourceTraces: null,
+      data: {
+        page_id: ctx.pageId,
+        template_id: 'T-TRANSFORM',
+        variant: 'v1',
+        grade: ctx.grade,
+        instruction_text: ctx.instructionText,
+        instruction_audio: ctx.instructionAudio,
+        cell_size: 40,
+        items: t.transformations.map((tf) => ({
+          original: tf.sourceWord,
+          rule: 'add_silent_e',
+          answer: tf.targetWord,
+          image: (tf.imageName || tf.targetWord) + '.webp',
+          audio: tf.audioName ? tf.audioName + '.mp3' : null,
+          input_type: 'handwrite'
+        }))
+      }
+    };
+  }
+
+  function translateWordTransformText(topics, ctx) {
+    const t = topics[0];
+    if (!t || !Array.isArray(t.transformations)) {
+      throw new Error('word_transform_text topic missing transformations');
+    }
+    return {
+      kind: 'legacy',
+      templateId: 'T-TRANSFORM',
+      variant: 'v2',
+      sourceTraces: null,
+      data: {
+        page_id: ctx.pageId,
+        template_id: 'T-TRANSFORM',
+        variant: 'v2',
+        grade: ctx.grade,
+        instruction_text: ctx.instructionText,
+        instruction_audio: ctx.instructionAudio,
+        cell_size: 40,
+        items: t.transformations.map((tf) => ({
+          original: tf.sourceWord,
+          rule: 'add_silent_e',
+          answer: tf.targetWord,
+          image: null,
+          input_type: 'handwrite'
+        }))
+      }
+    };
+  }
+
   const TOPIC_TRANSLATORS = {
     english_sound_box_full:         translateSoundBoxFull,
     english_sound_box_partial_fill: translateSoundBoxPartialFill,
@@ -383,7 +609,14 @@
     english_onset_rime_blend:       translateOnsetRimeBlend,
     english_phoneme_blend_picture:  translatePhonemeBlendPicture,
     english_word_bank_cloze:        translateWordBankCloze,
-    english_find_word:              translateFindWord
+    english_find_word:              translateFindWord,
+    english_circle_word:            translateCircleWord,
+    english_sort_words:             translateSortWords,
+    english_sequence:               translateSequence,
+    english_trace_letter:           translateTraceLetter,
+    english_shadow_writing:         translateShadowWriting,
+    english_word_transform_picture: translateWordTransformPicture,
+    english_word_transform_text:    translateWordTransformText
   };
 
   // ============ Template / variant labels (SSOT: Bitable 題型 Template 表) ============
@@ -434,7 +667,39 @@
     english_word_bank_cloze:
       () => ({ templateId: 'T-FILLIN', variantNumber: 1, variantName: 'Word Bank Cloze (2 Rows)' }),
     english_find_word:
-      () => ({ templateId: 'T-FINDWORD', variantNumber: null, variantName: 'Find Words in Grid' })
+      () => ({ templateId: 'T-FINDWORD', variantNumber: null, variantName: 'Find Words in Grid' }),
+    english_circle_word:
+      () => ({ templateId: 'T-CIRCLE', variantNumber: 3, variantName: 'Circle the Word (6 or 8 Cards, Multi-Select)' }),
+    english_sort_words: (topics) => {
+      const display = topics[0] && topics[0].cardDisplay;
+      return display === 'letter'
+        ? { templateId: 'T-SORT', variantNumber: 2, variantName: 'Sort Words (2 Buckets, Letter Case)' }
+        : { templateId: 'T-SORT', variantNumber: 2, variantName: 'Sort Words (2 Buckets, 6 Cards)' };
+    },
+    english_sequence: (topics) => {
+      const display = topics[0] && topics[0].cardDisplay;
+      return display === 'letter'
+        ? { templateId: 'T-SEQUENCE', variantNumber: 2, variantName: 'ABC Order Sequencing (4 Cards, 4 Slots)' }
+        : { templateId: 'T-SEQUENCE', variantNumber: 1, variantName: 'Story Pictures in Order (4 Cards, 4 Slots)' };
+    },
+    english_trace_letter: (topics) => {
+      const letter = (topics[0] && topics[0].letter) || '';
+      const isUpper = /^[A-Z]$/.test(letter);
+      return isUpper
+        ? { templateId: 'T-TRACE', variantNumber: 1, variantName: 'Letter Tracing - Uppercase (4 Cells)' }
+        : { templateId: 'T-TRACE', variantNumber: 2, variantName: 'Letter Tracing - Lowercase (4 Cells)' };
+    },
+    english_shadow_writing: (topics) => {
+      const letter = (topics[0] && topics[0].letter) || '';
+      const isUpper = /^[A-Z]$/.test(letter);
+      return isUpper
+        ? { templateId: 'T-TRACE', variantNumber: 3, variantName: 'Shadow Writing - Uppercase (10 Cells)' }
+        : { templateId: 'T-TRACE', variantNumber: 4, variantName: 'Shadow Writing - Lowercase (10 Cells)' };
+    },
+    english_word_transform_picture:
+      () => ({ templateId: 'T-TRANSFORM', variantNumber: 1, variantName: 'Add Silent-e with Picture (4 Cells)' }),
+    english_word_transform_text:
+      () => ({ templateId: 'T-TRANSFORM', variantNumber: 2, variantName: 'Add Silent-e Text Only (4 Cells)' })
   };
 
   function resolveTemplateMeta(topicType, topics) {
@@ -466,7 +731,14 @@
       english_onset_rime_blend: 'Tap each sound. Blend them together. Write the word.',
       english_phoneme_blend_picture: 'Listen to each sound. Blend and write the word.',
       english_word_bank_cloze: 'Pick a word from the word bank. Write it in the blank.',
-      english_find_word: 'Find and circle each word in the grid.'
+      english_find_word: 'Find and circle each word in the grid.',
+      english_circle_word: 'Circle the target word every time you see it.',
+      english_sort_words: 'Sort the cards into the right group.',
+      english_sequence: 'Put the cards in the correct order.',
+      english_trace_letter: 'Trace the letter. Say its sound.',
+      english_shadow_writing: 'Trace each letter along the shadow.',
+      english_word_transform_picture: 'Add a silent e. Write the new word!',
+      english_word_transform_text: 'Add a silent e. Write the new word!'
     };
     const pageInstr = page && page.instructionText;
     const topicInstr = topics[0] && topics[0].instructionText;
