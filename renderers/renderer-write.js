@@ -55,13 +55,20 @@ window.JOJO_RENDERERS['T-WRITE'] = function (data, container) {
       row.appendChild(hint);
     }
 
-    // Writing cells for the answer (largest, most prominent element)
+    // Writing cells for the answer (largest, most prominent element).
+    // Optional item.prefill[] gives N-1 already-filled cells (e.g. Initial Sound
+    // Spelling: answer is the first letter, rest of the word is shown as a
+    // light-gray trace). Same prefill convention as T-SOUNDBOX renderer.
     if (item.answer) {
       var cellGroup = document.createElement('div');
       cellGroup.className = 'ws-soundbox-group';
       var letters = item.answer.split('');
-      letters.forEach(function (ch) {
-        var cell = R.writingCell(cellSize, 'answer', ch);
+      var prefill = item.prefill || [];
+      letters.forEach(function (ch, ci) {
+        var pre = prefill[ci];
+        var scaffold = pre ? 'trace' : 'answer';
+        var content  = pre || ch;
+        var cell = R.writingCell(cellSize, scaffold, content);
         cellGroup.appendChild(cell);
       });
       row.appendChild(cellGroup);
