@@ -221,6 +221,40 @@
     };
   }
 
+  function translateInitialSoundSpelling(topics, ctx) {
+    // T-SPELL variant 1 (per spec). answer is the prefix of word
+    // (e.g. word='banana', answer='b'); remaining letters render as
+    // light-gray prefilled cells via the T-WRITE renderer's prefill path.
+    return {
+      kind: 'legacy',
+      templateId: 'T-WRITE',
+      variant: 'v1',
+      sourceTraces: topics.map((t) => t.source_trace || null),
+      data: {
+        page_id: ctx.pageId,
+        template_id: 'T-WRITE',
+        variant: 'v1',
+        grade: ctx.grade,
+        instruction_text: ctx.instructionText,
+        instruction_audio: ctx.instructionAudio,
+        cell_size: 48,
+        items: topics.map((t) => {
+          const word    = t.word || '';
+          const answer  = t.answer || '';
+          const letters = word.split('');
+          const prefill = letters.map((ch, i) => i < answer.length ? '' : ch);
+          return {
+            prompt_image: word + '.webp',
+            prompt_audio: word + '.mp3',
+            hint: null,
+            answer: word,
+            prefill: prefill
+          };
+        })
+      }
+    };
+  }
+
   function translateTraceWord(topics, ctx) {
     const t = topics[0];
     if (!t || !Array.isArray(t.wordsList)) {
@@ -669,6 +703,7 @@
     english_sound_box_full:         translateSoundBoxFull,
     english_sound_box_partial_fill: translateSoundBoxPartialFill,
     english_picture_spelling:       translatePictureSpelling,
+    english_initial_sound_spelling: translateInitialSoundSpelling,
     english_matching:               translateMatching,
     english_trace_word:             translateTraceWord,
     english_onset_rime_blend:       translateOnsetRimeBlend,
@@ -698,6 +733,8 @@
       () => ({ templateId: 'T-SOUNDBOX', variantNumber: 1, variantName: 'Sound Box - Partial Fill (4 Rows, 2x2)' }),
     english_picture_spelling:
       () => ({ templateId: 'T-SPELL', variantNumber: 2, variantName: 'Picture Spelling (4 Cells)' }),
+    english_initial_sound_spelling:
+      () => ({ templateId: 'T-SPELL', variantNumber: 1, variantName: 'Initial Sound Spelling (4 Cells)' }),
     english_circle_picture: (topics) => {
       const multi = ((topics[0] && topics[0].correctWords && topics[0].correctWords.length) || 0) > 1;
       return multi
@@ -802,6 +839,7 @@
       english_sound_box_full: 'Listen to the word. Write each sound in a box.',
       english_sound_box_partial_fill: 'Listen to the word. Fill in the missing sound.',
       english_picture_spelling: 'Look at the picture. Write the word.',
+      english_initial_sound_spelling: 'Look at the picture. Listen to the word. Write the first letter.',
       english_circle_picture: 'Listen to the word. Circle the picture.',
       english_matching: 'Listen to the word. Draw a line to match.',
       english_onset_rime_blend: 'Tap each sound. Blend them together. Write the word.',
@@ -865,7 +903,7 @@
         ctx, templateMeta,
         rows: topics.map((t) => ({
           options: (t.options || []).slice(),
-          correct: (t.correctWords || []).slice(),
+          correct: t.correctWords || (t.correctAnswer ? [t.correctAnswer] : []),
           sourceTraceMap: t.source_trace_map || {}
         }))
       };

@@ -176,6 +176,32 @@
         { topicType:"english_sound_box_partial_fill", word:"dad", blankBefore:"d", blankAfter:"d",  answer:"a",
           source_trace:"content_pool.decodable_words[12]" }
       ]
+    },
+    initialSound: {
+      pageId: 80173, pageNumber: 1,
+      instructionText: "Look at the picture. Listen to the word. Write the first letter.",
+      instructionKey: "look_at_the_picture_listen_to_the_word_write_the_first_letter",
+      englishLetterTopicList: [
+        { topicId:1, topicNumber:1, topicType:"english_initial_sound_spelling",
+          word:"banana", displaySuffix:"anana", answer:"b" },
+        { topicId:2, topicNumber:2, topicType:"english_initial_sound_spelling",
+          word:"butterfly", displaySuffix:"utterfly", answer:"b" },
+        { topicId:3, topicNumber:3, topicType:"english_initial_sound_spelling",
+          word:"duck", displaySuffix:"uck", answer:"d" },
+        { topicId:4, topicNumber:4, topicType:"english_initial_sound_spelling",
+          word:"elephant", displaySuffix:"lephant", answer:"e" }
+      ]
+    },
+    circlePictureSingle: {
+      pageId: 30205, pageNumber: 5,
+      instructionText: "Listen to the sound. Circle the picture that starts with that sound.",
+      instructionKey: "listen_to_the_sound_circle_the_picture_that_starts_with_that_sound",
+      englishLetterTopicList: [
+        { topicId:1, topicNumber:1, topicType:"english_circle_picture",
+          targetLetter:"D", targetSound:"/d/",
+          options:["dog","apple","mouse","cat","egg","fish"],
+          correctAnswer:"dog" }
+      ]
     }
   };
 
@@ -580,6 +606,44 @@
     };
     const r = T(page, {}, 'K-1a_U02', 'K');
     eq(r.ctx.instructionAudio, 'pick_a_word_from_the_word_bank_write_it_in_the_blank.mp3', 'falls back to topic-level key');
+  });
+
+  runner.check('initial_sound_spelling → T-WRITE v1 with prefill (1 blank + rest filled)', () => {
+    const r = T(PAGES.initialSound, {}, 'PK-2a_U04', 'PreK');
+    eq(r.kind, 'legacy', 'kind');
+    eq(r.templateId, 'T-WRITE', 'templateId (internal renderer key)');
+    eq(r.variant, 'v1', 'variant');
+    eq(r.data.items.length, 4, 'items.length');
+    // banana → answer 'b' is first letter, prefill is ['', 'a','n','a','n','a']
+    eq(r.data.items[0].answer, 'banana', 'item[0].answer is full word');
+    eq(r.data.items[0].prefill, ['','a','n','a','n','a'], 'item[0].prefill');
+    eq(r.data.items[0].prompt_image, 'banana.webp', 'item[0].prompt_image');
+    eq(r.data.items[0].prompt_audio, 'banana.mp3', 'item[0].prompt_audio');
+    // duck → answer 'd', prefill ['', 'u','c','k']
+    eq(r.data.items[2].answer, 'duck', 'item[2].answer');
+    eq(r.data.items[2].prefill, ['','u','c','k'], 'item[2].prefill');
+    eq(r.templateMeta,
+      { templateId: 'T-SPELL', variantNumber: 1, variantName: 'Initial Sound Spelling (4 Cells)' },
+      'templateMeta');
+  });
+
+  runner.check('initial_sound_spelling default instruction applies when text/key missing', () => {
+    const page = JSON.parse(JSON.stringify(PAGES.initialSound));
+    delete page.instructionText;
+    delete page.instructionKey;
+    const r = T(page, {}, 'PK-2a_U04', 'PreK');
+    eq(r.ctx.instructionText,
+      'Look at the picture. Listen to the word. Write the first letter.',
+      'falls back to TOPIC_DEFAULT_INSTR');
+  });
+
+  runner.check('circle_picture correctAnswer (single-string) fallback → row.correct = [answer]', () => {
+    const r = T(PAGES.circlePictureSingle, {}, 'PK-2a_U02', 'PreK');
+    eq(r.kind, 'circle_multi', 'kind');
+    eq(r.rows.length, 1, 'rows.length');
+    eq(r.rows[0].options.length, 6, 'options count');
+    eq(r.rows[0].correct, ['dog'], 'correct derived from correctAnswer');
+    eq(r.templateMeta.variantNumber, 1, 'variantNumber 1 (Circle Picture by Sound, single)');
   });
 
   runner.done();
