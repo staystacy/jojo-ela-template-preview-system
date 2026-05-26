@@ -8,6 +8,64 @@ window.JOJO_RENDERERS['T-TRACE'] = function (data, container) {
   R.annotate(inst, 'instruction_text');
   container.appendChild(inst);
 
+  // === T-TRACE Word variant 8/9/10 row-based layout (spec: 2 word × 2 cells) ===
+  // Each row = left (image + audio) + right (2 trace cells, each showing the
+  // full word split into letters). Matches Figma frames trace-08/09/10.
+  if (Array.isArray(data.rows) && data.rows.length > 0) {
+    var rowCellSize = data.cell_size || 48;
+    var rowsContainer = document.createElement('div');
+    rowsContainer.className = 'ws-trace-word-rows';
+    rowsContainer.style.display = 'flex';
+    rowsContainer.style.flexDirection = 'column';
+    rowsContainer.style.gap = '16px';
+
+    data.rows.forEach(function (row, ri) {
+      var rowEl = document.createElement('div');
+      rowEl.className = 'ws-trace-word-row';
+      rowEl.style.display = 'flex';
+      rowEl.style.alignItems = 'center';
+      rowEl.style.gap = '20px';
+
+      var leftCol = document.createElement('div');
+      leftCol.style.display = 'flex';
+      leftCol.style.flexDirection = 'column';
+      leftCol.style.alignItems = 'center';
+      leftCol.style.gap = '6px';
+      if (row.image) {
+        var rImg = R.imagePlaceholder(row.image, 56, 56);
+        R.annotate(rImg, 'rows[' + ri + '].image');
+        leftCol.appendChild(rImg);
+      }
+      if (row.audio) {
+        var rAb = R.audioButton(row.audio);
+        R.annotate(rAb, 'rows[' + ri + '].audio');
+        leftCol.appendChild(rAb);
+      }
+      rowEl.appendChild(leftCol);
+
+      var cellsCol = document.createElement('div');
+      cellsCol.style.display = 'flex';
+      cellsCol.style.gap = '12px';
+      (row.cells || []).forEach(function (cellData, ci) {
+        var group = document.createElement('div');
+        group.className = 'ws-soundbox-group';
+        (cellData.content || '').split('').forEach(function (ch) {
+          group.appendChild(R.writingCell(rowCellSize, cellData.scaffold, ch));
+        });
+        R.annotate(group, 'rows[' + ri + '].cells[' + ci + ']');
+        cellsCol.appendChild(group);
+      });
+      rowEl.appendChild(cellsCol);
+
+      R.annotate(rowEl, 'rows[' + ri + ']');
+      rowsContainer.appendChild(rowEl);
+    });
+
+    container.appendChild(rowsContainer);
+    return;
+  }
+
+  // === Legacy: demo_area + cells layout (T-TRACE letter variants 1-7, demo mode data-trace.js) ===
   // Layout A: left demo panel + right writing grid
   var layout = document.createElement('div');
   layout.className = 'ws-layout-a';

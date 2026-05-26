@@ -261,19 +261,25 @@
       throw new Error('trace_word topic missing wordsList');
     }
     const words = t.wordsList;
+    // Spec (ELA-Template-json.html #8/#9/#10-shadow-writing/guided-to-freehand/freehand-...-word-4-cells):
+    // wordsList.length === 2, each word renders in its own row with image + audio + 2 trace cells.
+    if (words.length !== 2) {
+      console.warn('[bitable] english_trace_word: spec expects wordsList.length === 2, got ' +
+        words.length + ' — rendering first ' + Math.min(words.length, 2));
+    }
     const SCAFFOLD_BY_GUIDE = {
       'All Guide':          ['trace', 'trace', 'trace', 'trace'],
       'Guided to Freehand': ['trace', 'trace', 'faded', 'faded'],
       'Free':               ['blank', 'blank', 'blank', 'blank']
     };
     const guide = t.guideMode || 'All Guide';
-    const scaffolds = SCAFFOLD_BY_GUIDE[guide] || words.map(() => 'trace');
-    const first = words[0] || {};
+    const scaffolds = SCAFFOLD_BY_GUIDE[guide] || ['trace', 'trace', 'trace', 'trace'];
+    const rowWords = words.slice(0, 2);
     return {
       kind: 'legacy',
       templateId: 'T-TRACE',
       variant: 'v2',
-      sourceTraces: words.map(() => null),
+      sourceTraces: rowWords.map(() => null),
       data: {
         page_id: ctx.pageId,
         template_id: 'T-TRACE',
@@ -282,15 +288,14 @@
         instruction_text: ctx.instructionText,
         instruction_audio: ctx.instructionAudio,
         cell_size: 48,
-        demo_area: {
-          content: first.word || '',
-          animation: 'stroke_order',
-          audio: first.audioName ? first.audioName + '.mp3' : null,
-          image: first.imageName ? first.imageName + '.webp' : null
-        },
-        cells: words.map((w, i) => ({
-          scaffold: scaffolds[i] || 'trace',
-          content: w.word
+        rows: rowWords.map((w, ri) => ({
+          word: w.word || '',
+          image: w.imageName ? w.imageName + '.webp' : null,
+          audio: w.audioName ? w.audioName + '.mp3' : null,
+          cells: [
+            { scaffold: scaffolds[ri * 2],     content: w.word || '' },
+            { scaffold: scaffolds[ri * 2 + 1], content: w.word || '' }
+          ]
         }))
       }
     };

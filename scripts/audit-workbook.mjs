@@ -87,17 +87,23 @@ const EXTRACTORS = {
   },
 
   english_trace_word(t) {
+    // Spec: wordsList.length === 2, 2 row × 2 cells.
     if (!Array.isArray(t.wordsList) || !t.wordsList[0]) {
       return { issues: [{ kind: 'translator_error', msg: 'missing wordsList' }] };
     }
-    const first = t.wordsList[0];
+    const rowWords = t.wordsList.slice(0, 2);
     const exp = [];
     const imgs = [];
-    if (first.audioName) {
-      exp.push({ slot: 'demo.audio', label: first.word || first.audioName, audioName: first.audioName, expectCategory: 'word' });
+    rowWords.forEach((w, i) => {
+      if (w.audioName) exp.push({ slot: `row[${i}].audio`, label: w.word || w.audioName, audioName: w.audioName, expectCategory: 'word' });
+      if (w.imageName) imgs.push({ slot: `row[${i}].image`, word: w.imageName });
+    });
+    const issues = [];
+    if (t.wordsList.length !== 2) {
+      issues.push({ kind: 'json_schema_mismatch',
+        msg: `wordsList.length=${t.wordsList.length} (spec: 2)` });
     }
-    if (first.imageName) imgs.push({ slot: 'demo.image', word: first.imageName });
-    return { templateId: 'T-TRACE', expectations: exp, images: imgs };
+    return { templateId: 'T-TRACE', expectations: exp, images: imgs, issues };
   },
 
   english_sound_box_full(t) {
@@ -363,6 +369,14 @@ function auditPage(page, ctx, M) {
           label: '(answer marking lost)',
           audioName: null,
           expectCategory: 'translator_contract',
+          actualCategory: iss.msg
+        });
+      } else if (iss.kind === 'json_schema_mismatch') {
+        out.mismatch.push({
+          slot: `topic[${ti}].json_schema`,
+          label: '(schema mismatch)',
+          audioName: null,
+          expectCategory: 'json_schema',
           actualCategory: iss.msg
         });
       }

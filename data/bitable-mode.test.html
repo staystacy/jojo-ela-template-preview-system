@@ -225,6 +225,29 @@
         { topicId:2, topicNumber:2, topicType:"english_sound_box_digraph_full",
           word:"sock", answer:["s","o","ck"], answer_phoneme_ids:["onset_s","short_o","digraph_ck"] }
       ]
+    },
+    traceWord2: {
+      // Spec-perfect: 2 word × 2 cells per row
+      pageId: 80161, pageNumber: 1,
+      englishLetterTopicList: [{
+        topicId:1, topicNumber:1, topicType:"english_trace_word",
+        guideMode: "All Guide",
+        wordsList: [
+          { word:"banana",    imageName:"banana",    audioName:"banana" },
+          { word:"butterfly", imageName:"butterfly", audioName:"butterfly" }
+        ]
+      }]
+    },
+    traceWord1Fallback: {
+      // PK-3 series — 1 word (JSON schema mismatch); translator renders 1 row + warn
+      pageId: 70101, pageNumber: 1,
+      englishLetterTopicList: [{
+        topicId:1, topicNumber:1, topicType:"english_trace_word",
+        guideMode: "All Guide",
+        wordsList: [
+          { word:"mom", imageName:"mom", audioName:"mom" }
+        ]
+      }]
     }
   };
 
@@ -458,17 +481,42 @@
     eq(r.templateMeta, { templateId: 'T-CIRCLE', variantNumber: 2, variantName: 'Circle Pictures by Digraph (4 Cards, Multi-Select)' }, 'templateMeta');
   });
 
-  runner.check('K-1a U01 P1 trace_word → T-TRACE renderer with 4 trace cells', () => {
+  runner.check('K-1a U01 P1 trace_word (4-word JSON) → row-based fallback (first 2 rendered)', () => {
     const r = T(PAGES.trace, {}, 'K-1a_U01', 'K');
     eq(r.kind, 'legacy', 'kind');
     eq(r.templateId, 'T-TRACE', 'templateId');
     eq(r.variant, 'v2', 'variant');
-    eq(r.data.cells.length, 4, 'cells.length');
-    eq(r.data.cells.map(c => c.scaffold), ['trace','trace','trace','trace'], 'scaffolds');
-    eq(r.data.cells.map(c => c.content), ['cat','hat','map','bag'], 'cell contents');
-    eq(r.data.demo_area.content, 'cat', 'demo content');
-    eq(r.data.demo_area.image, 'cat.webp', 'demo image');
+    // Spec expects 2 word; K-1a fixture has 4 — translator slices first 2 + warns
+    eq(r.data.rows.length, 2, 'rows.length (slice 0..2)');
+    eq(r.data.rows[0].word, 'cat', 'rows[0].word');
+    eq(r.data.rows[0].image, 'cat.webp', 'rows[0].image');
+    eq(r.data.rows[0].audio, 'cat.mp3', 'rows[0].audio');
+    eq(r.data.rows[0].cells.length, 2, 'rows[0].cells.length');
+    eq(r.data.rows[0].cells.map(c => c.scaffold), ['trace','trace'], 'rows[0] scaffolds');
+    eq(r.data.rows[1].word, 'hat', 'rows[1].word');
     eq(r.templateMeta, { templateId: 'T-TRACE', variantNumber: 8, variantName: 'Shadow Writing - Word (4 Cells)' }, 'templateMeta');
+  });
+
+  runner.check('trace_word (spec-perfect 2-word) → 2 rows × 2 cells', () => {
+    const r = T(PAGES.traceWord2, {}, 'K-1a_U01', 'K');
+    eq(r.kind, 'legacy', 'kind');
+    eq(r.data.rows.length, 2, 'rows.length');
+    eq(r.data.rows[0].word, 'banana', 'rows[0].word');
+    eq(r.data.rows[0].image, 'banana.webp', 'rows[0].image');
+    eq(r.data.rows[0].audio, 'banana.mp3', 'rows[0].audio');
+    eq(r.data.rows[0].cells.length, 2, 'rows[0].cells.length');
+    eq(r.data.rows[0].cells[0].scaffold, 'trace', 'rows[0].cells[0].scaffold');
+    eq(r.data.rows[0].cells[0].content, 'banana', 'rows[0].cells[0].content (full word for letter split)');
+    eq(r.data.rows[1].word, 'butterfly', 'rows[1].word');
+    eq(r.data.rows[1].cells[1].scaffold, 'trace', 'rows[1].cells[1].scaffold');
+  });
+
+  runner.check('trace_word (1-word PK-3 JSON) → 1 row fallback + warn', () => {
+    const r = T(PAGES.traceWord1Fallback, {}, 'PK-3a_U01', 'PreK');
+    eq(r.kind, 'legacy', 'kind');
+    eq(r.data.rows.length, 1, 'rows.length (only 1 word in JSON)');
+    eq(r.data.rows[0].word, 'mom', 'rows[0].word');
+    eq(r.data.rows[0].cells.length, 2, 'rows[0].cells.length (still 2 trace cells per spec)');
   });
 
   runner.check('K-1a U01 P3 onset_rime_blend → T-BLEND with phoneme labels', () => {
@@ -485,11 +533,14 @@
     eq(r.templateMeta, { templateId: 'T-BLEND', variantNumber: 1, variantName: 'Onset-Rime Blend (2 Rows)' }, 'templateMeta');
   });
 
-  runner.check('Trace_word guideMode "Guided to Freehand" → mixed scaffolds', () => {
+  runner.check('Trace_word guideMode "Guided to Freehand" → scaffolds [t,t]/[f,f] across 2 rows', () => {
     const page = JSON.parse(JSON.stringify(PAGES.trace));
     page.englishLetterTopicList[0].guideMode = 'Guided to Freehand';
     const r = T(page, {}, 'K-1a_U01', 'K');
-    eq(r.data.cells.map(c => c.scaffold), ['trace','trace','faded','faded'], 'guided-to-freehand scaffolds');
+    // SCAFFOLD_BY_GUIDE['Guided to Freehand'] = ['trace','trace','faded','faded']
+    // row 0 cells take scaffolds[0,1] = [trace,trace]; row 1 cells take [2,3] = [faded,faded]
+    eq(r.data.rows[0].cells.map(c => c.scaffold), ['trace','trace'], 'row 0 scaffolds');
+    eq(r.data.rows[1].cells.map(c => c.scaffold), ['faded','faded'], 'row 1 scaffolds');
     eq(r.templateMeta.variantNumber, 9, 'variantNumber 9');
   });
 
@@ -497,7 +548,8 @@
     const page = JSON.parse(JSON.stringify(PAGES.trace));
     page.englishLetterTopicList[0].guideMode = 'Free';
     const r = T(page, {}, 'K-1a_U01', 'K');
-    eq(r.data.cells.map(c => c.scaffold), ['blank','blank','blank','blank'], 'free scaffolds');
+    eq(r.data.rows[0].cells.map(c => c.scaffold), ['blank','blank'], 'row 0 blanks');
+    eq(r.data.rows[1].cells.map(c => c.scaffold), ['blank','blank'], 'row 1 blanks');
     eq(r.templateMeta.variantNumber, 10, 'variantNumber 10');
     eq(r.templateMeta.variantName, 'Freehand Writing - Word (4 Cells)', 'variantName');
   });
