@@ -595,60 +595,71 @@
     };
   }
 
-  function translateWordTransformPicture(topics, ctx) {
+  // v2605.25: unified english_transform with displayType branch
+  // Old english_word_transform_picture / english_word_transform_text are deprecated
+  function translateTransform(topics, ctx) {
     const t = topics[0];
-    if (!t || !Array.isArray(t.transformations)) {
-      throw new Error('word_transform_picture topic missing transformations');
+    if (!t || !Array.isArray(t.items)) {
+      throw new Error('english_transform topic missing items[]');
     }
+    const isPicture = (t.displayType || 'image') === 'image';
     return {
       kind: 'legacy',
       templateId: 'T-TRANSFORM',
-      variant: 'v1',
+      variant: isPicture ? 'v1' : 'v2',
       sourceTraces: null,
       data: {
         page_id: ctx.pageId,
         template_id: 'T-TRANSFORM',
-        variant: 'v1',
+        variant: isPicture ? 'v1' : 'v2',
         grade: ctx.grade,
         instruction_text: ctx.instructionText,
         instruction_audio: ctx.instructionAudio,
         cell_size: 40,
-        items: t.transformations.map((tf) => ({
-          original: tf.sourceWord,
+        items: t.items.map((it) => ({
+          original: it.sourceWord,
           rule: 'add_silent_e',
-          answer: tf.targetWord,
-          image: (tf.imageName || tf.targetWord) + '.webp',
-          audio: tf.audioName ? tf.audioName + '.mp3' : null,
+          answer: it.answer,
+          // v2605.25: image / audio key derived from words; no imageName/audioName field anymore
+          image: isPicture ? (it.sourceWord + '.webp') : null,
+          audio: it.sourceWord ? (it.sourceWord + '.mp3') : null,
           input_type: 'handwrite'
         }))
       }
     };
   }
 
-  function translateWordTransformText(topics, ctx) {
-    const t = topics[0];
-    if (!t || !Array.isArray(t.transformations)) {
-      throw new Error('word_transform_text topic missing transformations');
+  // v2605.25: english_ladder — flat structure (one topic = one ladder)
+  // A page typically has 2 topics (left + right ladders) under englishLetterTopicList.
+  // Renderer expects {ladders: [{word_family, rungs: [{hint, answer, image}]}]}.
+  function translateLadder(topics, ctx) {
+    const ladderTopics = topics.filter((t) => t && t.topicType === 'english_ladder');
+    if (ladderTopics.length === 0) {
+      throw new Error('english_ladder: no ladder topics found');
     }
     return {
       kind: 'legacy',
-      templateId: 'T-TRANSFORM',
-      variant: 'v2',
+      templateId: 'T-LADDER',
+      variant: 'v1',
       sourceTraces: null,
       data: {
         page_id: ctx.pageId,
-        template_id: 'T-TRANSFORM',
-        variant: 'v2',
+        template_id: 'T-LADDER',
         grade: ctx.grade,
         instruction_text: ctx.instructionText,
         instruction_audio: ctx.instructionAudio,
-        cell_size: 40,
-        items: t.transformations.map((tf) => ({
-          original: tf.sourceWord,
-          rule: 'add_silent_e',
-          answer: tf.targetWord,
-          image: null,
-          input_type: 'handwrite'
+        cell_size: 36,
+        ladders: ladderTopics.map((t) => ({
+          word_family: '-' + (t.rime || '') + ' family',
+          rime: t.rime || '',
+          rungs: (t.rungs || []).map((r) => {
+            const isBlank = !r.word;  // partial picture无图阶
+            return {
+              hint: r.targetText || '',
+              answer: r.word || '',
+              image: isBlank ? null : (r.word + '.webp')
+            };
+          })
         }))
       }
     };
@@ -669,8 +680,9 @@
     english_sequence:               translateSequence,
     english_trace_letter:           translateTraceLetter,
     english_shadow_writing:         translateShadowWriting,
-    english_word_transform_picture: translateWordTransformPicture,
-    english_word_transform_text:    translateWordTransformText
+    // v2605.25: unified english_transform (displayType branch) + english_ladder (flat)
+    english_transform:              translateTransform,
+    english_ladder:                 translateLadder
   };
 
   // ============ Template / variant labels (SSOT: Bitable 題型 Template 表) ============
@@ -750,10 +762,20 @@
         ? { templateId: 'T-TRACE', variantNumber: 3, variantName: 'Shadow Writing - Uppercase (10 Cells)' }
         : { templateId: 'T-TRACE', variantNumber: 4, variantName: 'Shadow Writing - Lowercase (10 Cells)' };
     },
-    english_word_transform_picture:
-      () => ({ templateId: 'T-TRANSFORM', variantNumber: 1, variantName: 'Add Silent-e with Picture (4 Cells)' }),
-    english_word_transform_text:
-      () => ({ templateId: 'T-TRANSFORM', variantNumber: 2, variantName: 'Add Silent-e Text Only (4 Cells)' })
+    // v2605.25: unified english_transform with displayType, and english_ladder
+    english_transform: (topics) => {
+      const dt = topics[0] && topics[0].displayType;
+      return dt === 'text'
+        ? { templateId: 'T-TRANSFORM', variantNumber: 2, variantName: 'Word Transformation - Text Only (4 Cells, 2×2)' }
+        : { templateId: 'T-TRANSFORM', variantNumber: 1, variantName: 'Word Transformation - With Picture (4 Cells, 2×2)' };
+    },
+    english_ladder: (topics) => {
+      // Partial picture detected by any rung having empty word
+      const hasBlank = topics.some((t) => (t.rungs || []).some((r) => !r.word));
+      return hasBlank
+        ? { templateId: 'T-LADDER', variantNumber: 2, variantName: 'Word Family Ladder - Partial Picture Support (2 Ladders, 3 Rungs Each)' }
+        : { templateId: 'T-LADDER', variantNumber: 1, variantName: 'Word Family Ladder - Full Picture Support (2 Ladders, 3 Rungs Each)' };
+    }
   };
 
   function resolveTemplateMeta(topicType, topics) {
@@ -791,8 +813,8 @@
       english_sequence: 'Put the cards in the correct order.',
       english_trace_letter: 'Trace the letter. Say its sound.',
       english_shadow_writing: 'Trace each letter along the shadow.',
-      english_word_transform_picture: 'Add a silent e. Write the new word!',
-      english_word_transform_text: 'Add a silent e. Write the new word!'
+      english_transform: 'Add a silent e. Write the new word!',
+      english_ladder: 'Climb the ladder! Change the first letter to make new words.'
     };
     const pageInstr = page && page.instructionText;
     const topicInstr = topics[0] && topics[0].instructionText;
