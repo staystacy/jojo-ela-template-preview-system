@@ -278,24 +278,20 @@ const EXTRACTORS = {
   english_ladder(t) {
     // v2605.25 production translator: flat structure (one topic = one ladder).
     // T-LADDER renderer emits NO audio buttons for rungs (only the page
-    // instruction button); each rung has an image placeholder only when
-    // rung.word is truthy. Blank rungs (intentional or JSON gap) get image:null.
+    // instruction button). Each rung gets an image placeholder only when
+    // rung.word is truthy.
+    //
+    // Per spec ELA-Template-json-260525.html#ladder-2-partial-picture-support:
+    // Partial Picture Support variant intentionally has ONE blank rung per
+    // ladder (word + targetText both empty string by design). Kids guess the
+    // first letter using the rime word bank. Skip empty rungs silently —
+    // they're a feature, not a data gap.
     const rungs = Array.isArray(t.rungs) ? t.rungs : [];
     const images = [];
-    const issues = [];
     rungs.forEach((r, i) => {
-      if (r.word) {
-        images.push({ slot: `rung[${i}].image`, word: r.word });
-      } else {
-        // Distinguish "JSON data incomplete" from "intentional blank rung":
-        // partial-picture variant is supposed to have some blank rungs at the
-        // top so kids guess the word. Flag only when ALL rungs in a topic are
-        // blank, or first-rung is blank (always a data error).
-        // For K-2 the empty 3rd rung pattern is most likely JSON gap, so list it.
-        issues.push({ kind: 'json_blank_rung', msg: `rung[${i}]: word/targetText empty (JSON incomplete?)` });
-      }
+      if (r.word) images.push({ slot: `rung[${i}].image`, word: r.word });
     });
-    return { templateId: 'T-LADDER', expectations: [], images, issues };
+    return { templateId: 'T-LADDER', expectations: [], images };
   }
 };
 
@@ -355,14 +351,6 @@ function auditPage(page, ctx, M) {
           label: '(answer marking lost)',
           audioName: null,
           expectCategory: 'translator_contract',
-          actualCategory: iss.msg
-        });
-      } else if (iss.kind === 'json_blank_rung') {
-        out.mismatch.push({
-          slot: `topic[${ti}].json_data`,
-          label: '(empty rung in JSON)',
-          audioName: null,
-          expectCategory: 'json_complete',
           actualCategory: iss.msg
         });
       }
