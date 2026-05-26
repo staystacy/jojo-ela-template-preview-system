@@ -98,28 +98,37 @@
   }
 
   // Resolve an audio filename into a real URL.
-  // Lookup order: phoneme (semantic ID like onset_k, short_a, digraph_sh)
-  //               → word → rime → instruction → letter (uppercase letter name).
-  // Phoneme is checked first so that pages passing semantic phoneme IDs
-  // (e.g. "onset_k.mp3") don't fall through to letter-name audio.
-  function resolveAudioUrl(name, ext) {
+  // hint (optional) ∈ { 'letter' | 'rime' | 'phoneme' | 'word' | 'instruction' }
+  //   When given, the named category is tried first so that same-token files
+  //   in multiple categories (e.g. word/at.mp3 vs rime/at.mp3, word/a.mp3 vs
+  //   letter/A.mp3) resolve to the semantically-correct one.
+  // Fallback order when no hint or hint miss: phoneme → word → rime → instruction → letter.
+  function resolveAudioUrl(name, ext, hint) {
     const M = State.assetManifest;
     ext = ext || 'mp3';
-    if (M.phonemes && M.phonemes[name] && M.phonemes[name].audio) {
-      return '/assets/audio/phoneme/' + name + '.' + ext;
+    const tryCategory = {
+      phoneme:     () => (M.phonemes && M.phonemes[name] && M.phonemes[name].audio)
+                          ? '/assets/audio/phoneme/' + name + '.' + ext : null,
+      word:        () => (M.words && M.words[name] && M.words[name].audio)
+                          ? '/assets/audio/word/' + name + '.' + ext : null,
+      rime:        () => (M.rimes && M.rimes[name] && M.rimes[name].audio)
+                          ? '/assets/audio/rime/' + name + '.' + ext : null,
+      instruction: () => (M.instructions && M.instructions[name] && M.instructions[name].audio)
+                          ? '/assets/audio/instruction/' + name + '.' + ext : null,
+      letter:      () => {
+        const upper = String(name).toUpperCase();
+        return (M.letters && M.letters[upper] && M.letters[upper].audio)
+               ? '/assets/audio/letter/' + upper + '.' + ext : null;
+      }
+    };
+    if (hint && tryCategory[hint]) {
+      const url = tryCategory[hint]();
+      if (url) return url;
     }
-    if (M.words && M.words[name] && M.words[name].audio) {
-      return '/assets/audio/word/' + name + '.' + ext;
-    }
-    if (M.rimes && M.rimes[name] && M.rimes[name].audio) {
-      return '/assets/audio/rime/' + name + '.' + ext;
-    }
-    if (M.instructions && M.instructions[name] && M.instructions[name].audio) {
-      return '/assets/audio/instruction/' + name + '.' + ext;
-    }
-    const upper = String(name).toUpperCase();
-    if (M.letters && M.letters[upper] && M.letters[upper].audio) {
-      return '/assets/audio/letter/' + upper + '.' + ext;
+    for (const cat of ['phoneme', 'word', 'rime', 'instruction', 'letter']) {
+      if (cat === hint) continue;
+      const url = tryCategory[cat]();
+      if (url) return url;
     }
     return null;
   }
@@ -225,6 +234,11 @@
     // T-SPELL variant 1 (per spec). answer is the prefix of word
     // (e.g. word='banana', answer='b'); remaining letters render as
     // light-gray prefilled cells via the T-WRITE renderer's prefill path.
+    //
+    // Audio: one button plays the letter name then the word, sequentially
+    // ("A...Apple"). renderer-write reads prompt_audio_sequence and
+    // applyAssetFallbacks wires sequential playback. prompt_audio kept as
+    // single-button fallback for mock/demo data that lacks the sequence.
     return {
       kind: 'legacy',
       templateId: 'T-WRITE',
@@ -246,6 +260,9 @@
           return {
             prompt_image: word + '.webp',
             prompt_audio: word + '.mp3',
+            prompt_audio_sequence: answer
+              ? ['letter:' + answer.toLowerCase() + '.mp3', word + '.mp3']
+              : null,
             hint: null,
             answer: word,
             prefill: prefill
@@ -320,13 +337,12 @@
         instruction_text: ctx.instructionText,
         instruction_audio: ctx.instructionAudio,
         cell_size: 56,
-        // Audio: prefer semantic IDs (onset_k.mp3, at.mp3) over graphemes (c.mp3, at.mp3).
-        // Falling back to grapheme makes the resolver pick letter-name audio (C = "see"),
-        // not the phoneme /k/, so always use *_id when JSON provides it.
+        // Audio: onset is a phoneme (onset_k.mp3); rime gets explicit 'rime:' prefix
+        // so the resolver routes 'at.mp3' to rime/ rather than word/at.mp3.
         items: rows.map((r) => ({
           phoneme_audios: [
-            (r.onset_phoneme_id || r.onset) + '.mp3',
-            (r.rime_id          || r.rime ) + '.mp3'
+            'phoneme:' + (r.onset_phoneme_id || r.onset) + '.mp3',
+            'rime:'    + (r.rime_id          || r.rime ) + '.mp3'
           ],
           phoneme_labels: ['/' + r.onset + '/', '/' + r.rime + '/'],
           image: (r.imageName || r.word) + '.webp',
@@ -356,14 +372,14 @@
         instruction_audio: ctx.instructionAudio,
         cell_size: 48,
         // Prefer semantic phoneme IDs ("onset_h.mp3", "short_i.mp3") over single-letter
-        // graphemes ("h.mp3" → letter-name audio "aitch"). Falls back to grapheme if
-        // the page predates phoneme_ids generation.
+        // graphemes ("h.mp3" → letter-name audio "aitch"). 'phoneme:' prefix forces the
+        // resolver to look in phoneme/ first even when the grapheme collides with a word.
         items: rows.map((r) => {
           const ids = (Array.isArray(r.phoneme_ids) && r.phoneme_ids.length === (r.phonemes || []).length)
             ? r.phoneme_ids
             : (r.phonemes || []);
           return {
-            phoneme_audios: ids.map((p) => p + '.mp3'),
+            phoneme_audios: ids.map((p) => 'phoneme:' + p + '.mp3'),
             phoneme_labels: (r.phonemes || []).map((p) => '/' + p + '/'),
             image: (r.imageName || r.word) + '.webp',
             answer: r.answer || r.word
@@ -583,7 +599,9 @@
         demo_area: {
           content: letter,
           animation: 'stroke_order',
-          audio: letter.toLowerCase() + '.mp3',
+          // 'letter:' prefix forces resolver to look up letter category first,
+          // so word/a.mp3 doesn't hijack letter/A.mp3 when both exist.
+          audio: 'letter:' + letter.toLowerCase() + '.mp3',
           image: t.word ? t.word + '.webp' : null,
           word: t.word || null
         },
@@ -625,7 +643,7 @@
         demo_area: {
           content: letter,
           animation: 'stroke_order',
-          audio: letter.toLowerCase() + '.mp3',
+          audio: 'letter:' + letter.toLowerCase() + '.mp3',
           image: null,
           word: (t.wordList && t.wordList[0]) || null
         },
@@ -659,9 +677,11 @@
           original: it.sourceWord,
           rule: 'add_silent_e',
           answer: it.answer,
-          // v2605.25: image / audio key derived from words; no imageName/audioName field anymore
+          // v2605.25: image / audio key derived from words; no imageName/audioName field anymore.
+          // Picture variant (v1) gets dual audio: sourceWord ("hop") + new word ("hope").
           image: isPicture ? (it.sourceWord + '.webp') : null,
           audio: it.sourceWord ? (it.sourceWord + '.mp3') : null,
+          target_audio: (isPicture && it.answer) ? (it.answer + '.mp3') : null,
           input_type: 'handwrite'
         }))
       }
@@ -1107,13 +1127,18 @@
     // Audio + phoneme buttons → resolveAudioUrl handles all categories in one pass.
     // T-BLEND uses R.phonemeButton (class .ws-phoneme-btn); everything else uses
     // R.audioButton (class .ws-audio-btn). Both put filename in `title=Audio: …`.
+    // Optional category prefix in filename ("letter:a.mp3" / "rime:at.mp3" / "phoneme:onset_k.mp3")
+    // becomes the resolver hint so same-token files in multiple categories
+    // (e.g. word/at.mp3 vs rime/at.mp3) resolve to the right semantic.
     container.querySelectorAll('.ws-audio-btn, .ws-phoneme-btn').forEach((btn) => {
+      if (btn.dataset.audioSequence) return;  // sequence buttons handled by wireSequencePlayback
       const title = btn.getAttribute('title') || '';
-      const m = title.match(/Audio:\s*([^.\s]+)\.(mp3|wav|m4a)$/i);
+      const m = title.match(/Audio:\s*(?:(letter|rime|phoneme|word|instruction):)?([^.\s:]+)\.(mp3|wav|m4a)$/i);
       if (!m) return;
-      const name = m[1];
-      const ext  = m[2].toLowerCase();
-      const url  = resolveAudioUrl(name, ext);
+      const hint = m[1] || null;
+      const name = m[2];
+      const ext  = m[3].toLowerCase();
+      const url  = resolveAudioUrl(name, ext, hint);
       if (url) {
         btn.dataset.audioSrc = url;
         wireAudioPlayback(btn);
@@ -1124,6 +1149,34 @@
         btn.title = '⚠ Missing audio: ' + name + '.' + ext + (inInstruction ? ' (instruction TTS)' : '');
       }
     });
+
+    // Sequence buttons (T-SPELL initial_sound_spelling) — resolve each token then
+    // play them back-to-back with a short gap on click.
+    container.querySelectorAll('.ws-audio-btn[data-audio-sequence]').forEach((btn) => {
+      const tokens = parseSequence(btn.dataset.audioSequence);
+      const urls = tokens.map((tok) => {
+        const m = tok.match(/^(?:(letter|rime|phoneme|word|instruction):)?([^.\s:]+)\.(mp3|wav|m4a)$/i);
+        if (!m) return null;
+        return resolveAudioUrl(m[2], m[3].toLowerCase(), m[1] || null);
+      }).filter(Boolean);
+      if (urls.length === 0) {
+        btn.disabled = true;
+        btn.classList.add('ws-bitable-audio-missing');
+        btn.title = '⚠ Missing audio sequence: ' + btn.dataset.audioSequence;
+        return;
+      }
+      btn.dataset.audioSrcSequence = JSON.stringify(urls);
+      wireSequencePlayback(btn);
+    });
+  }
+
+  function parseSequence(raw) {
+    try {
+      const arr = JSON.parse(raw);
+      return Array.isArray(arr) ? arr : [];
+    } catch (_) {
+      return [];
+    }
   }
 
   function replaceWithRealImg(placeholderEl, word, url) {
@@ -1166,6 +1219,38 @@
         console.warn('audio play failed', src, err);
       });
     });
+  }
+
+  // Sequential playback for T-SPELL: play urls[0] → 200ms gap → urls[1] → ...
+  function wireSequencePlayback(btn) {
+    if (btn._wired) return;
+    btn._wired = true;
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      let urls;
+      try { urls = JSON.parse(btn.dataset.audioSrcSequence || '[]'); } catch (_) { return; }
+      if (!Array.isArray(urls) || urls.length === 0) return;
+      for (let i = 0; i < urls.length; i++) {
+        await playOnce(urls[i]);
+        if (i < urls.length - 1) await sleep(200);
+      }
+    });
+  }
+
+  function playOnce(src) {
+    return new Promise((resolve) => {
+      const audio = new Audio(src);
+      audio.addEventListener('ended', resolve, { once: true });
+      audio.addEventListener('error', resolve, { once: true });
+      audio.play().catch((err) => {
+        console.warn('audio play failed', src, err);
+        resolve();
+      });
+    });
+  }
+
+  function sleep(ms) {
+    return new Promise((r) => setTimeout(r, ms));
   }
 
   // ============ Expose ============

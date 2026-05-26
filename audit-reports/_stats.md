@@ -1,20 +1,19 @@
 # Audit Stats (auto-generated)
 
-Generated: 2026-05-26T08:22:51.006Z
+Generated: 2026-05-26T14:15:16.413Z
 
-| Workbook | Pages | A (render fail) | B (missing) | C (mismatch) |
-|----------|-------|-----------------|-------------|--------------|
-| PK-1a | 30 | 0 | 0 | 0 |
-| PK-1b | 30 | 0 | 0 | 0 |
-| PK-2a | 30 | 0 | 0 | 0 |
-| PK-2b | 30 | 0 | 0 | 0 |
-| PK-3a | 30 | 0 | 82 | 15 |
-| PK-3b | 30 | 0 | 41 | 15 |
-| PK-3c | 30 | 0 | 72 | 14 |
-| K-1a | 30 | 0 | 0 | 5 |
-| K-1b | 30 | 0 | 0 | 5 |
-| K-2 | 30 | 0 | 0 | 5 |
-| K-3 | 30 | 0 | 8 | 0 |
-| K-4 | 30 | 0 | 24 | 0 |
-| G1-1 | 30 | 0 | 7 | 4 |
-| G1-2 | 30 | 0 | 55 | 4 |
+| Workbook | Pages | A (render fail) | B (missing) | C (mismatch) | Δ from last run |
+|----------|-------|-----------------|-------------|--------------|-----------------|
+| PK-1a | 30 | 0 | 0 | 0 | _baseline_ |
+| PK-1b | 30 | 0 | 0 | 0 | _baseline_ |
+| PK-2a | 30 | 0 | 0 | 0 | _baseline_ |
+| PK-2b | 30 | 0 | 0 | 0 | _baseline_ |
+| PK-3c | 30 | 0 | 0 | 0 | _baseline_ |
+| PK-4 | 30 | 0 | 0 | 0 | _baseline_ |
+| K-1a | 30 | 0 | 0 | 0 | _baseline_ |
+| K-1b | 30 | 0 | 0 | 0 | _baseline_ |
+| K-2 | 30 | 0 | 0 | 0 | _baseline_ |
+| K-5a | 30 | 0 | 0 | 0 | _baseline_ |
+| K-5b | 30 | 0 | 0 | 0 | _baseline_ |
+| G1-2 | 30 | 0 | 0 | 0 | _baseline_ |
+| G1-1 | 30 | 0 | 7 | 0 | _baseline_ |

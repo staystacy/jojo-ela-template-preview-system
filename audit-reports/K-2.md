@@ -9,10 +9,4 @@ _None — every page is supported by an existing translator._
 _None — every expected audio/image exists in 10-Final-Assets._
 
 ## C. 資源語意錯位
-| Page | slot | label | expects | actually plays |
-|------|------|-------|---------|----------------|
-| U01_P01.json | topic[0].json_schema | `(schema mismatch)` | json_schema | `wordsList.length=4 (spec: 2)/null` |
-| U02_P01.json | topic[0].json_schema | `(schema mismatch)` | json_schema | `wordsList.length=4 (spec: 2)/null` |
-| U03_P01.json | topic[0].json_schema | `(schema mismatch)` | json_schema | `wordsList.length=4 (spec: 2)/null` |
-| U04_P01.json | topic[0].json_schema | `(schema mismatch)` | json_schema | `wordsList.length=4 (spec: 2)/null` |
-| U05_P01.json | topic[0].json_schema | `(schema mismatch)` | json_schema | `wordsList.length=4 (spec: 2)/null` |
+_None — every audio button resolves to the category implied by its label._

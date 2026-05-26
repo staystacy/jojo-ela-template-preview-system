@@ -248,6 +248,22 @@
           { word:"mom", imageName:"mom", audioName:"mom" }
         ]
       }]
+    },
+    transformPicture: {
+      // G1-1 U01_P02 — english_transform with displayType=image (silent-e add)
+      pageId: 230102, pageNumber: 2,
+      instructionText: "Add the silent e to make a new word.",
+      instructionKey: "add_the_silent_e_to_make_a_new_word",
+      englishLetterTopicList: [{
+        topicId:1, topicNumber:1, topicType:"english_transform",
+        displayType: "image",
+        items: [
+          { sourceWord:"hat", answer:"hate" },
+          { sourceWord:"mad", answer:"made" },
+          { sourceWord:"can", answer:"cane" },
+          { sourceWord:"cap", answer:"cape" }
+        ]
+      }]
     }
   };
 
@@ -526,7 +542,7 @@
     eq(r.variant, 'v1', 'variant');
     eq(r.data.items.length, 2, 'items.length');
     eq(r.data.items[0].phoneme_labels, ['/c/', '/at/'], 'items[0].phoneme_labels');
-    eq(r.data.items[0].phoneme_audios, ['c.mp3', 'at.mp3'], 'items[0].phoneme_audios');
+    eq(r.data.items[0].phoneme_audios, ['phoneme:c.mp3', 'rime:at.mp3'], 'items[0].phoneme_audios (prefixed)');
     eq(r.data.items[0].image, 'cat.webp', 'items[0].image');
     eq(r.data.items[0].answer, 'cat', 'items[0].answer');
     eq(r.data.instruction_text, 'Tap each sound. Blend them together. Write the word.', 'instr from topic-level');
@@ -561,7 +577,7 @@
     eq(r.variant, 'v2', 'variant');
     eq(r.data.items.length, 2, 'items.length');
     eq(r.data.items[0].phoneme_labels, ['/h/','/i/','/t/'], 'phoneme labels');
-    eq(r.data.items[0].phoneme_audios, ['h.mp3','i.mp3','t.mp3'], 'phoneme audios');
+    eq(r.data.items[0].phoneme_audios, ['phoneme:h.mp3','phoneme:i.mp3','phoneme:t.mp3'], 'phoneme audios (prefixed)');
     eq(r.data.items[0].image, 'hit.webp', 'image');
     eq(r.templateMeta, { templateId: 'T-BLEND', variantNumber: 2, variantName: 'Phoneme Blend - Picture Support (2 Rows)' }, 'templateMeta');
   });
@@ -632,9 +648,9 @@
       }]
     };
     const r = T(page, {}, 'K-1a_U01', 'K');
-    eq(r.data.items[0].phoneme_audios, ['onset_k.mp3', 'at.mp3'], 'row 0 uses *_id audio filenames');
+    eq(r.data.items[0].phoneme_audios, ['phoneme:onset_k.mp3', 'rime:at.mp3'], 'row 0 uses *_id audio filenames (prefixed)');
     eq(r.data.items[0].phoneme_labels, ['/c/', '/at/'], 'row 0 keeps grapheme labels');
-    eq(r.data.items[1].phoneme_audios, ['onset_h.mp3', 'at.mp3'], 'row 1');
+    eq(r.data.items[1].phoneme_audios, ['phoneme:onset_h.mp3', 'rime:at.mp3'], 'row 1');
   });
 
   runner.check('phoneme_blend_picture uses phoneme_ids when present', () => {
@@ -650,7 +666,7 @@
       }]
     };
     const r = T(page, {}, 'K-1a_U04', 'K');
-    eq(r.data.items[0].phoneme_audios, ['onset_h.mp3', 'short_i.mp3', 'onset_t.mp3'], 'audio uses phoneme_ids');
+    eq(r.data.items[0].phoneme_audios, ['phoneme:onset_h.mp3', 'phoneme:short_i.mp3', 'phoneme:onset_t.mp3'], 'audio uses phoneme_ids (prefixed)');
     eq(r.data.items[0].phoneme_labels, ['/h/', '/i/', '/t/'], 'labels keep graphemes');
   });
 
@@ -663,7 +679,7 @@
       }]
     };
     const r = T(page, {}, 'K-1a_U05', 'K');
-    eq(r.data.items[0].phoneme_audios, ['s.mp3', 'i.mp3', 't.mp3'], 'fallback to graphemes');
+    eq(r.data.items[0].phoneme_audios, ['phoneme:s.mp3', 'phoneme:i.mp3', 'phoneme:t.mp3'], 'fallback to graphemes (prefixed)');
   });
 
   runner.check('instructionKey at topic-level falls back when missing on page', () => {
@@ -756,6 +772,52 @@
     eq(r.templateMeta,
        { templateId: 'T-SOUNDBOX', variantNumber: 4, variantName: 'Sound Box - Digraph Full (2 Rows)' },
        'templateMeta');
+  });
+
+  // ============ Edge cases (T-SPELL sequential + T-TRANSFORM picture + audio prefix) ============
+
+  runner.check('initial_sound_spelling → prompt_audio_sequence plays letter then word', () => {
+    const r = T(PAGES.initialSound, {}, 'PK-2a_U04', 'PreK');
+    // banana, answer='b' → sequence ['letter:b.mp3', 'banana.mp3']
+    eq(r.data.items[0].prompt_audio_sequence,
+       ['letter:b.mp3', 'banana.mp3'],
+       'item[0] sequence (letter + word)');
+    eq(r.data.items[2].prompt_audio_sequence,
+       ['letter:d.mp3', 'duck.mp3'],
+       'item[2] sequence');
+    // single prompt_audio still kept as fallback for legacy renderers / mock data
+    eq(r.data.items[0].prompt_audio, 'banana.mp3', 'item[0].prompt_audio fallback preserved');
+  });
+
+  runner.check('english_transform (displayType=image) → dual audio + image per item', () => {
+    const r = T(PAGES.transformPicture, {}, 'G1-1_U01', 'G1');
+    eq(r.kind, 'legacy', 'kind');
+    eq(r.templateId, 'T-TRANSFORM', 'templateId');
+    eq(r.variant, 'v1', 'variant (picture mode)');
+    eq(r.data.items.length, 4, 'items.length');
+    // hat → hate: image + source audio + new-word target audio
+    eq(r.data.items[0].original, 'hat', 'item[0].original (source word)');
+    eq(r.data.items[0].answer, 'hate', 'item[0].answer (new word)');
+    eq(r.data.items[0].image, 'hat.webp', 'item[0].image');
+    eq(r.data.items[0].audio, 'hat.mp3', 'item[0].audio (source word)');
+    eq(r.data.items[0].target_audio, 'hate.mp3', 'item[0].target_audio (new word)');
+    // cap → cape
+    eq(r.data.items[3].audio, 'cap.mp3', 'item[3].audio');
+    eq(r.data.items[3].target_audio, 'cape.mp3', 'item[3].target_audio');
+  });
+
+  runner.check('onset_rime_blend → phoneme/rime prefix routes resolver to right category', () => {
+    const r = T(PAGES.blend, {}, 'K-1a_U01', 'K');
+    eq(r.kind, 'legacy', 'kind');
+    eq(r.templateId, 'T-BLEND', 'templateId');
+    // PAGES.blend rows: c+at → cat. Without prefix, 'at' would hit word/at.mp3
+    // (audit C-segment bug). With 'rime:' prefix the resolver looks in rime/ first.
+    eq(r.data.items[0].phoneme_audios,
+       ['phoneme:c.mp3', 'rime:at.mp3'],
+       'item[0] phoneme_audios prefixed');
+    eq(r.data.items[1].phoneme_audios,
+       ['phoneme:h.mp3', 'rime:at.mp3'],
+       'item[1] phoneme_audios prefixed');
   });
 
   runner.done();

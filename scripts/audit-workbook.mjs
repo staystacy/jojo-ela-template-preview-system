@@ -32,15 +32,31 @@ async function loadManifest() {
   return res.json();
 }
 
-// Mirror of resolveAudioUrl() in data/bitable-mode.js
-function resolveAudioCategory(name, M) {
+// Mirror of resolveAudioUrl() in data/bitable-mode.js.
+// hint (optional): when the translator emits a category-prefixed filename
+// ("letter:a.mp3", "rime:at.mp3"), the resolver tries that category first.
+// Pass the expectCategory as hint so audit reflects runtime behaviour.
+function resolveAudioCategory(name, M, hint) {
   if (!name) return null;
-  if (M.phonemes && M.phonemes[name])              return 'phoneme';
-  if (M.words    && M.words[name] && M.words[name].audio) return 'word';
-  if (M.rimes    && M.rimes[name])                 return 'rime';
-  if (M.instructions && M.instructions[name])      return 'instruction';
-  const up = String(name).toUpperCase();
-  if (M.letters && M.letters[up])                  return 'letter';
+  const tryCat = {
+    phoneme:     () => (M.phonemes && M.phonemes[name]) ? 'phoneme' : null,
+    word:        () => (M.words && M.words[name] && M.words[name].audio) ? 'word' : null,
+    rime:        () => (M.rimes && M.rimes[name]) ? 'rime' : null,
+    instruction: () => (M.instructions && M.instructions[name]) ? 'instruction' : null,
+    letter:      () => {
+      const up = String(name).toUpperCase();
+      return (M.letters && M.letters[up]) ? 'letter' : null;
+    }
+  };
+  if (hint && tryCat[hint]) {
+    const c = tryCat[hint]();
+    if (c) return c;
+  }
+  for (const cat of ['phoneme', 'word', 'rime', 'instruction', 'letter']) {
+    if (cat === hint) continue;
+    const c = tryCat[cat]();
+    if (c) return c;
+  }
   return null;
 }
 
@@ -338,7 +354,7 @@ function auditPage(page, ctx, M) {
 
   // Instruction audio check
   if (page.instructionKey) {
-    const cat = resolveAudioCategory(page.instructionKey, M);
+    const cat = resolveAudioCategory(page.instructionKey, M, 'instruction');
     if (!cat) {
       out.missing.push({ slot: 'instruction.audio', label: page.instructionKey, audioName: page.instructionKey, expectCategory: 'instruction' });
     } else if (cat !== 'instruction') {
@@ -382,7 +398,10 @@ function auditPage(page, ctx, M) {
       }
     });
     expectations.forEach((e) => {
-      const actualCat = resolveAudioCategory(e.audioName, M);
+      // Pass expectCategory as hint to mirror translator behaviour: translators
+      // prefix audio with their expected category ("letter:a.mp3", "rime:at.mp3"),
+      // so resolver finds it in that category first instead of falling through to word.
+      const actualCat = resolveAudioCategory(e.audioName, M, e.expectCategory);
       const slot = `topic[${ti}].${e.slot}`;
       if (!actualCat) {
         out.missing.push({ slot, label: e.label, audioName: e.audioName, expectCategory: e.expectCategory });
@@ -518,11 +537,42 @@ async function main() {
 
   // Stats file (script-generated, safe to overwrite each run).
   // Hand-written `summary.md` lives alongside and is not touched.
+  // _stats.json carries the previous run's numbers so the markdown table
+  // can show diff per workbook (e.g. "C: 3→0") on this run.
+  const histPath = join(OUT_DIR, '_stats.json');
+  let prev = {};
+  if (existsSync(histPath)) {
+    try {
+      const hist = JSON.parse(readFileSync(histPath, 'utf8'));
+      (hist.workbooks || []).forEach((w) => { prev[w.wb] = w; });
+    } catch (_) { /* ignore parse error */ }
+  }
+  writeFileSync(histPath, JSON.stringify({
+    generated: new Date().toISOString(),
+    workbooks: summary.workbooks
+  }, null, 2));
+
   const sumLines = ['# Audit Stats (auto-generated)', '',
     `Generated: ${new Date().toISOString()}`, '',
-    '| Workbook | Pages | A (render fail) | B (missing) | C (mismatch) |',
-    '|----------|-------|-----------------|-------------|--------------|'];
-  summary.workbooks.forEach((s) => sumLines.push(`| ${s.wb} | ${s.total} | ${s.A} | ${s.B} | ${s.C} |`));
+    '| Workbook | Pages | A (render fail) | B (missing) | C (mismatch) | Δ from last run |',
+    '|----------|-------|-----------------|-------------|--------------|-----------------|'];
+  summary.workbooks.forEach((s) => {
+    const p = prev[s.wb];
+    let diff;
+    if (!p) {
+      diff = '_baseline_';
+    } else {
+      const parts = [];
+      [['A', s.A, p.A], ['B', s.B, p.B], ['C', s.C, p.C]].forEach(([k, cur, prv]) => {
+        if (cur !== prv) {
+          const arrow = cur < prv ? '↓' : '↑';
+          parts.push(`${k}: ${prv}→${cur} ${arrow}`);
+        }
+      });
+      diff = parts.length === 0 ? '_no change_' : parts.join(' · ');
+    }
+    sumLines.push(`| ${s.wb} | ${s.total} | ${s.A} | ${s.B} | ${s.C} | ${diff} |`);
+  });
   writeFileSync(join(OUT_DIR, '_stats.md'), sumLines.join('\n'));
   console.log(`[audit] stats → ${join(OUT_DIR, '_stats.md')}`);
 }

@@ -37,8 +37,16 @@ window.JOJO_RENDERERS['T-WRITE'] = function (data, container) {
       row.appendChild(img);
     }
 
-    // Audio button
-    if (item.prompt_audio) {
+    // Audio button. If prompt_audio_sequence is set (T-SPELL initial-sound-spelling),
+    // emit one button that plays letter → word sequentially; otherwise single audio.
+    if (Array.isArray(item.prompt_audio_sequence) && item.prompt_audio_sequence.length > 0) {
+      var seq = item.prompt_audio_sequence;
+      var audio = R.audioButton(seq[0]);
+      audio.dataset.audioSequence = JSON.stringify(seq);
+      audio.title = 'Audio: ' + seq.join(' → ');
+      R.annotate(audio, 'items[' + i + '].prompt_audio_sequence');
+      row.appendChild(audio);
+    } else if (item.prompt_audio) {
       var audio = R.audioButton(item.prompt_audio);
       R.annotate(audio, 'items[' + i + '].prompt_audio');
       row.appendChild(audio);
