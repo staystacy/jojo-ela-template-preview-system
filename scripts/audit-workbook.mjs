@@ -292,6 +292,18 @@ const EXTRACTORS = {
       if (r.word) images.push({ slot: `rung[${i}].image`, word: r.word });
     });
     return { templateId: 'T-LADDER', expectations: [], images };
+  },
+
+  english_sound_box_digraph_partial_fill(t) {
+    // K-3+ digraph variant — same renderer expectations as single-letter partial:
+    // one word audio + one word image per item. Digraph cell layout is renderer-side.
+    return EXTRACTORS.english_sound_box_partial_fill(t);
+  },
+
+  english_sound_box_digraph_full(t) {
+    // K-3+ digraph variant — same renderer expectations as single-letter full:
+    // one word audio + one word image per item.
+    return EXTRACTORS.english_sound_box_full(t);
   }
 };
 

@@ -202,6 +202,29 @@
           options:["dog","apple","mouse","cat","egg","fish"],
           correctAnswer:"dog" }
       ]
+    },
+    soundBoxDigraphPartial: {
+      pageId: 80179, pageNumber: 7,
+      instructionText: "Listen to the word. Fill in the missing sounds.",
+      instructionKey: "english_sound_box_digraph_partial_fill",
+      englishLetterTopicList: [
+        { topicId:1, topicNumber:1, topicType:"english_sound_box_digraph_partial_fill",
+          word:"sheep", blankBefore:"", blankAfter:"eep", answer:"sh",
+          answer_phoneme_id:"digraph_sh", digraphHint:"sh or ck" },
+        { topicId:2, topicNumber:2, topicType:"english_sound_box_digraph_partial_fill",
+          word:"duck", blankBefore:"du", blankAfter:"", answer:"ck",
+          answer_phoneme_id:"digraph_ck", digraphHint:"sh or ck" }
+      ]
+    },
+    soundBoxDigraphFull: {
+      pageId: 80180, pageNumber: 8,
+      instructionText: "Listen to the word. Write each sound in a box.",
+      englishLetterTopicList: [
+        { topicId:1, topicNumber:1, topicType:"english_sound_box_digraph_full",
+          word:"sheep", answer:["sh","ee","p"], answer_phoneme_ids:["digraph_sh","long_e","onset_p"] },
+        { topicId:2, topicNumber:2, topicType:"english_sound_box_digraph_full",
+          word:"sock", answer:["s","o","ck"], answer_phoneme_ids:["onset_s","short_o","digraph_ck"] }
+      ]
     }
   };
 
@@ -644,6 +667,43 @@
     eq(r.rows[0].options.length, 6, 'options count');
     eq(r.rows[0].correct, ['dog'], 'correct derived from correctAnswer');
     eq(r.templateMeta.variantNumber, 1, 'variantNumber 1 (Circle Picture by Sound, single)');
+  });
+
+  runner.check('sound_box_digraph_partial_fill → T-SOUNDBOX v1 with digraph as single cell', () => {
+    const r = T(PAGES.soundBoxDigraphPartial, {}, 'K-3_U01', 'K');
+    eq(r.kind, 'legacy', 'kind');
+    eq(r.templateId, 'T-SOUNDBOX', 'templateId');
+    eq(r.variant, 'v1', 'variant (partial reuses v1)');
+    eq(r.data.items.length, 2, 'items.length');
+    // sheep: blankBefore="" answer="sh" blankAfter="eep" → phonemes=['sh','e','e','p'], prefill=['','e','e','p']
+    eq(r.data.items[0].phonemes, ['sh','e','e','p'], 'sheep.phonemes (digraph in cell 0)');
+    eq(r.data.items[0].prefill, ['','e','e','p'], 'sheep.prefill (blank at cell 0)');
+    eq(r.data.items[0].boxes, 4, 'sheep.boxes');
+    // duck: blankBefore="du" answer="ck" blankAfter="" → phonemes=['d','u','ck'], prefill=['d','u','']
+    eq(r.data.items[1].phonemes, ['d','u','ck'], 'duck.phonemes (digraph in cell 2)');
+    eq(r.data.items[1].prefill, ['d','u',''], 'duck.prefill');
+    eq(r.data.items[1].boxes, 3, 'duck.boxes');
+    eq(r.templateMeta,
+       { templateId: 'T-SOUNDBOX', variantNumber: 3, variantName: 'Sound Box - Digraph Partial Fill (4 Rows, 2x2)' },
+       'templateMeta');
+  });
+
+  runner.check('sound_box_digraph_full → T-SOUNDBOX v2 with digraph elements in answer array', () => {
+    const r = T(PAGES.soundBoxDigraphFull, {}, 'K-3_U04', 'K');
+    eq(r.kind, 'legacy', 'kind');
+    eq(r.templateId, 'T-SOUNDBOX', 'templateId');
+    eq(r.variant, 'v2', 'variant (full reuses v2)');
+    eq(r.data.items.length, 2, 'items.length');
+    // sheep: answer=["sh","ee","p"] → phonemes=['sh','ee','p'], 3 boxes
+    eq(r.data.items[0].phonemes, ['sh','ee','p'], 'sheep.phonemes (3 elements incl digraph + vowel team)');
+    eq(r.data.items[0].boxes, 3, 'sheep.boxes');
+    eq(r.data.items[0].prefill, ['','',''], 'sheep.prefill all blank');
+    // sock: answer=["s","o","ck"] → phonemes=['s','o','ck']
+    eq(r.data.items[1].phonemes, ['s','o','ck'], 'sock.phonemes (digraph in cell 2)');
+    eq(r.data.items[1].boxes, 3, 'sock.boxes');
+    eq(r.templateMeta,
+       { templateId: 'T-SOUNDBOX', variantNumber: 4, variantName: 'Sound Box - Digraph Full (2 Rows)' },
+       'templateMeta');
   });
 
   runner.done();

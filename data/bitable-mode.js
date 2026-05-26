@@ -700,8 +700,10 @@
   }
 
   const TOPIC_TRANSLATORS = {
-    english_sound_box_full:         translateSoundBoxFull,
-    english_sound_box_partial_fill: translateSoundBoxPartialFill,
+    english_sound_box_full:                 translateSoundBoxFull,
+    english_sound_box_digraph_full:         translateSoundBoxFull,         // K-3+ digraph variant — reuses Full translator (answer array allows digraph element per cell)
+    english_sound_box_partial_fill:         translateSoundBoxPartialFill,
+    english_sound_box_digraph_partial_fill: translateSoundBoxPartialFill,  // K-3+ digraph variant — reuses Partial translator (answer string allows digraph in one cell)
     english_picture_spelling:       translatePictureSpelling,
     english_initial_sound_spelling: translateInitialSoundSpelling,
     english_matching:               translateMatching,
@@ -729,8 +731,12 @@
   const TEMPLATE_VARIANT_MAP = {
     english_sound_box_full:
       () => ({ templateId: 'T-SOUNDBOX', variantNumber: 2, variantName: 'Sound Box - Full (2 Rows)' }),
+    english_sound_box_digraph_full:
+      () => ({ templateId: 'T-SOUNDBOX', variantNumber: 4, variantName: 'Sound Box - Digraph Full (2 Rows)' }),
     english_sound_box_partial_fill:
       () => ({ templateId: 'T-SOUNDBOX', variantNumber: 1, variantName: 'Sound Box - Partial Fill (4 Rows, 2x2)' }),
+    english_sound_box_digraph_partial_fill:
+      () => ({ templateId: 'T-SOUNDBOX', variantNumber: 3, variantName: 'Sound Box - Digraph Partial Fill (4 Rows, 2x2)' }),
     english_picture_spelling:
       () => ({ templateId: 'T-SPELL', variantNumber: 2, variantName: 'Picture Spelling (4 Cells)' }),
     english_initial_sound_spelling:
@@ -837,7 +843,9 @@
     const TOPIC_DEFAULT_INSTR = {
       english_trace_word: 'Trace each word along the guide lines.',
       english_sound_box_full: 'Listen to the word. Write each sound in a box.',
+      english_sound_box_digraph_full: 'Listen to the word. Write each sound in a box.',
       english_sound_box_partial_fill: 'Listen to the word. Fill in the missing sound.',
+      english_sound_box_digraph_partial_fill: 'Listen to the word. Fill in the missing sounds.',
       english_picture_spelling: 'Look at the picture. Write the word.',
       english_initial_sound_spelling: 'Look at the picture. Listen to the word. Write the first letter.',
       english_circle_picture: 'Listen to the word. Circle the picture.',
