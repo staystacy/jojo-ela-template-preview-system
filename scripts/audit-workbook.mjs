@@ -235,8 +235,7 @@ const EXTRACTORS = {
   },
 
   english_word_transform_picture(t) {
-    // renderer-transform.js does not emit audio buttons (despite translator
-    // packing item.audio). Validate images only.
+    // Legacy topicType — production now uses english_transform with displayType.
     if (!Array.isArray(t.transformations)) return { issues: [{ kind: 'translator_error', msg: 'missing transformations' }] };
     const imgs = [];
     t.transformations.forEach((tf, i) => {
@@ -250,6 +249,19 @@ const EXTRACTORS = {
     return { templateId: 'T-TRANSFORM', expectations: [], images: [] };
   },
 
+  english_transform(t) {
+    // v2605.25 unified topicType: items[] with sourceWord/answer + displayType='image'|'text'
+    if (!Array.isArray(t.items)) return { issues: [{ kind: 'translator_error', msg: 'missing items' }] };
+    const isPicture = (t.displayType || 'image') === 'image';
+    const imgs = [];
+    if (isPicture) {
+      t.items.forEach((it, i) => {
+        if (it.sourceWord) imgs.push({ slot: `item[${i}].image`, word: it.sourceWord });
+      });
+    }
+    return { templateId: 'T-TRANSFORM', expectations: [], images: imgs };
+  },
+
   english_initial_sound_spelling(t) {
     // T-SPELL v1 (per spec) — uses T-WRITE renderer with prefill.
     // Visible audio button = prompt word; visible image = word picture.
@@ -261,6 +273,29 @@ const EXTRACTORS = {
       ],
       images: [{ slot: 'item.image', word: t.word }]
     };
+  },
+
+  english_ladder(t) {
+    // v2605.25 production translator: flat structure (one topic = one ladder).
+    // T-LADDER renderer emits NO audio buttons for rungs (only the page
+    // instruction button); each rung has an image placeholder only when
+    // rung.word is truthy. Blank rungs (intentional or JSON gap) get image:null.
+    const rungs = Array.isArray(t.rungs) ? t.rungs : [];
+    const images = [];
+    const issues = [];
+    rungs.forEach((r, i) => {
+      if (r.word) {
+        images.push({ slot: `rung[${i}].image`, word: r.word });
+      } else {
+        // Distinguish "JSON data incomplete" from "intentional blank rung":
+        // partial-picture variant is supposed to have some blank rungs at the
+        // top so kids guess the word. Flag only when ALL rungs in a topic are
+        // blank, or first-rung is blank (always a data error).
+        // For K-2 the empty 3rd rung pattern is most likely JSON gap, so list it.
+        issues.push({ kind: 'json_blank_rung', msg: `rung[${i}]: word/targetText empty (JSON incomplete?)` });
+      }
+    });
+    return { templateId: 'T-LADDER', expectations: [], images, issues };
   }
 };
 
@@ -320,6 +355,14 @@ function auditPage(page, ctx, M) {
           label: '(answer marking lost)',
           audioName: null,
           expectCategory: 'translator_contract',
+          actualCategory: iss.msg
+        });
+      } else if (iss.kind === 'json_blank_rung') {
+        out.mismatch.push({
+          slot: `topic[${ti}].json_data`,
+          label: '(empty rung in JSON)',
+          audioName: null,
+          expectCategory: 'json_complete',
           actualCategory: iss.msg
         });
       }
