@@ -1,5 +1,8 @@
 node_modules/
-.claude/
+# Ignore Claude Code transient state, but track shared config + skills
+.claude/*
+!.claude/skills/
+!.claude/launch.json
 .env
 .env.local
 .DS_Store

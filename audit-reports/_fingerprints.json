@@ -1,0 +1,69 @@
+{
+  "global": {
+    "manifest_sha": "5a3338c776f720fb",
+    "code_sha": "b3727639f01db9b7",
+    "updated_at": "2026-05-28T09:43:19.278Z"
+  },
+  "workbooks": {
+    "PK-1a": {
+      "page_json_sha": "673db700b8209635",
+      "audited_at": "2026-05-28T09:43:19.279Z",
+      "result": "pass"
+    },
+    "PK-1b": {
+      "page_json_sha": "2621cbe6c0442673",
+      "audited_at": "2026-05-28T09:43:19.279Z",
+      "result": "pass"
+    },
+    "PK-2a": {
+      "page_json_sha": "43088189d580e6a2",
+      "audited_at": "2026-05-28T09:43:19.279Z",
+      "result": "pass"
+    },
+    "PK-2b": {
+      "page_json_sha": "44b852e7ecb189ba",
+      "audited_at": "2026-05-28T09:43:19.279Z",
+      "result": "pass"
+    },
+    "PK-3c": {
+      "page_json_sha": "3ecd28e60496a680",
+      "audited_at": "2026-05-28T09:43:19.279Z",
+      "result": "pass"
+    },
+    "PK-4": {
+      "page_json_sha": "900adaea807a2926",
+      "audited_at": "2026-05-28T09:43:19.279Z",
+      "result": "pass"
+    },
+    "K-1a": {
+      "page_json_sha": "45dadeb22526d972",
+      "audited_at": "2026-05-28T09:43:19.279Z",
+      "result": "pass"
+    },
+    "K-1b": {
+      "page_json_sha": "7d377b6b807558b6",
+      "audited_at": "2026-05-28T09:43:19.279Z",
+      "result": "pass"
+    },
+    "K-2": {
+      "page_json_sha": "3ded4189b23601ca",
+      "audited_at": "2026-05-28T09:43:19.279Z",
+      "result": "pass"
+    },
+    "K-5a": {
+      "page_json_sha": "4acb25cdc3f290b8",
+      "audited_at": "2026-05-28T09:43:19.279Z",
+      "result": "pass"
+    },
+    "K-5b": {
+      "page_json_sha": "ea6a65fcf8c071dd",
+      "audited_at": "2026-05-28T09:43:19.279Z",
+      "result": "pass"
+    },
+    "G1-2": {
+      "page_json_sha": "d2091dab363a9d7b",
+      "audited_at": "2026-05-28T09:43:19.279Z",
+      "result": "pass"
+    }
+  }
+}
