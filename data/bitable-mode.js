@@ -724,6 +724,60 @@
     };
   }
 
+  // english_fixup — error correction. K-8 ships flat camelCase
+  // (incorrectSentence / correctSentence / errorWords[]); renderer-fixup expects
+  // snake_case + structured errors[{incorrect, correct, type}].
+  // renderer matches an error word via clean = word.replace(/[.,!?;:]/g,'').toLowerCase()
+  // against errorMap keyed by err.incorrect.toLowerCase(), so err.incorrect MUST be
+  // the punctuation-stripped, lowercased form (else "sat?" / "hop." never circle).
+  // correct / type are tooltip-only: derived by index-aligning the two sentences
+  // (K-8's pairs are equal-length, same-order), falling back to the raw word.
+  function translateFixup(topics, ctx) {
+    const t = topics[0];
+    if (!t || !Array.isArray(t.items)) {
+      throw new Error('english_fixup topic missing items[]');
+    }
+    const STRIP = /[.,!?;:]/g;
+    const norm = (s) => String(s).replace(STRIP, '').toLowerCase();
+    return {
+      kind: 'legacy',
+      templateId: 'T-FIXUP',
+      variant: 'v1',
+      sourceTraces: null,
+      data: {
+        page_id: ctx.pageId,
+        template_id: 'T-FIXUP',
+        variant: 'v1',
+        grade: ctx.grade,
+        instruction_text: ctx.instructionText,
+        instruction_audio: ctx.instructionAudio,
+        items: t.items.map((it) => {
+          const incorrect = it.incorrectSentence || '';
+          const correct   = it.correctSentence   || '';
+          const incTok = incorrect.split(/\s+/).filter(Boolean);
+          const corTok = correct.split(/\s+/).filter(Boolean);
+          const aligned = incTok.length === corTok.length;
+          const errors = (it.errorWords || []).map((ew) => {
+            const key = norm(ew);                                    // matches renderer's errorMap[clean]
+            const idx = incTok.findIndex((w) => norm(w) === key);
+            const correctForm = (aligned && idx !== -1) ? corTok[idx] : String(ew);
+            return { incorrect: key, correct: correctForm, type: classifyFixupError(ew, correctForm) };
+          });
+          return { incorrect_sentence: incorrect, errors, correct_sentence: correct, input_type: 'type' };
+        })
+      }
+    };
+  }
+
+  // Tooltip-only error-type inference (cosmetic; does not affect rendering).
+  function classifyFixupError(incorrectWord, correctWord) {
+    const STRIP = /[.,!?;:]/g;
+    const a = String(incorrectWord).replace(STRIP, '');
+    const b = String(correctWord).replace(STRIP, '');
+    if (a.toLowerCase() === b.toLowerCase()) return a !== b ? 'capitalization' : 'punctuation';
+    return 'spelling';
+  }
+
   const TOPIC_TRANSLATORS = {
     english_sound_box_full:                 translateSoundBoxFull,
     english_sound_box_digraph_full:         translateSoundBoxFull,         // K-3+ digraph variant — reuses Full translator (answer array allows digraph element per cell)
@@ -744,7 +798,8 @@
     english_shadow_writing:         translateShadowWriting,
     // v2605.25: unified english_transform (displayType branch) + english_ladder (flat)
     english_transform:              translateTransform,
-    english_ladder:                 translateLadder
+    english_ladder:                 translateLadder,
+    english_fixup:                  translateFixup
   };
 
   // ============ Template / variant labels (SSOT: Bitable 題型 Template 表) ============
@@ -843,7 +898,9 @@
       return hasBlank
         ? { templateId: 'T-LADDER', variantNumber: 2, variantName: 'Word Family Ladder - Partial Picture Support (2 Ladders, 3 Rungs Each)' }
         : { templateId: 'T-LADDER', variantNumber: 1, variantName: 'Word Family Ladder - Full Picture Support (2 Ladders, 3 Rungs Each)' };
-    }
+    },
+    english_fixup:
+      () => ({ templateId: 'T-FIXUP', variantNumber: 1, variantName: 'Fix the Mistakes - Capitalization & Punctuation' })
   };
 
   function resolveTemplateMeta(topicType, topics) {
@@ -885,7 +942,8 @@
       english_trace_letter: 'Trace the letter. Say its sound.',
       english_shadow_writing: 'Trace each letter along the shadow.',
       english_transform: 'Add a silent e. Write the new word!',
-      english_ladder: 'Climb the ladder! Change the first letter to make new words.'
+      english_ladder: 'Climb the ladder! Change the first letter to make new words.',
+      english_fixup: 'Circle the mistakes. Then write the correct sentence.'
     };
     const pageInstr = page && page.instructionText;
     const topicInstr = topics[0] && topics[0].instructionText;

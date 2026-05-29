@@ -256,6 +256,16 @@ const EXTRACTORS = {
     return { templateId: 'T-SEQUENCE', expectations: [], images: [] };
   },
 
+  english_fixup(t) {
+    // T-FIXUP error correction. renderer-fixup.js emits NO per-item audio/image
+    // buttons — only the page instruction button (checked separately above). So
+    // no asset expectations; A passes once the translator exists, B/C unaffected.
+    if (!Array.isArray(t.items)) {
+      return { issues: [{ kind: 'translator_error', msg: 'missing items[]' }] };
+    }
+    return { templateId: 'T-FIXUP', expectations: [], images: [] };
+  },
+
   english_word_transform_picture(t) {
     // Legacy topicType — production now uses english_transform with displayType.
     if (!Array.isArray(t.transformations)) return { issues: [{ kind: 'translator_error', msg: 'missing transformations' }] };
