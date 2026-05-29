@@ -1,6 +1,6 @@
 # Audit Stats (auto-generated)
 
-Generated: 2026-05-29T03:43:15.767Z
+Generated: 2026-05-29T09:08:24.780Z
 
 | Workbook | Pages | A (render fail) | B (missing) | C (mismatch) | Δ from last run |
 |----------|-------|-----------------|-------------|--------------|-----------------|
@@ -15,6 +15,6 @@ Generated: 2026-05-29T03:43:15.767Z
 | K-2 | 30 | 0 | 0 | 0 | _no change_ |
 | K-5a | 30 | 0 | 0 | 0 | _no change_ |
 | K-5b | 30 | 0 | 0 | 0 | _no change_ |
+| K-8 | 30 | 0 | 0 | 0 | _no change_ |
 | G1-2 | 30 | 0 | 0 | 0 | _no change_ |
-| G1-1 | 30 | 0 | 7 | 0 | _no change_ |
-| K-8 | 30 | 0 | 0 | 0 | _baseline_ |
+| G1-4a | 30 | 0 | 0 | 0 | _baseline_ |
