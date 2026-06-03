@@ -879,8 +879,20 @@
         : { templateId: 'T-TRACE', variantNumber: 2, variantName: 'Letter Tracing - Lowercase (4 Cells)' };
     },
     english_shadow_writing: (topics) => {
-      const letter = (topics[0] && topics[0].letter) || '';
+      const t = topics[0] || {};
+      const letter = t.letter || '';
+      const hint = t.showHint !== false; // default true
+      const isMixed = letter.length > 1; // "Aa", "Ff" etc.
       const isUpper = /^[A-Z]$/.test(letter);
+      if (isMixed) {
+        return { templateId: 'T-TRACE', variantNumber: 5, variantName: 'Guided to Freehand - Mixed Case (10 Cells)' };
+      }
+      if (!hint && isUpper) {
+        return { templateId: 'T-TRACE', variantNumber: 6, variantName: 'Freehand Writing - Uppercase (10 Cells)' };
+      }
+      if (!hint) {
+        return { templateId: 'T-TRACE', variantNumber: 7, variantName: 'Freehand Writing - Lowercase (10 Cells)' };
+      }
       return isUpper
         ? { templateId: 'T-TRACE', variantNumber: 3, variantName: 'Shadow Writing - Uppercase (10 Cells)' }
         : { templateId: 'T-TRACE', variantNumber: 4, variantName: 'Shadow Writing - Lowercase (10 Cells)' };
