@@ -15,6 +15,7 @@
  *   english_sound_box_partial_fill → T-SOUNDBOX v1
  *   english_picture_spelling       → T-WRITE     v2
  *   english_circle_picture         → kind:'circle_multi' (custom render)
+ *   english_circle_picture_rhyme  → T-CIRCLE    v5
  *   english_matching               → T-MATCH     v2
  */
 
@@ -512,6 +513,36 @@
     };
   }
 
+  function translateCirclePictureRhyme(topics, ctx) {
+    const t = topics[0];
+    if (!t || !Array.isArray(t.options)) {
+      throw new Error('circle_picture_rhyme topic missing options');
+    }
+    const correct = t.correctAnswer || (t.correctWords && t.correctWords[0]) || '';
+    return {
+      kind: 'legacy',
+      templateId: 'T-CIRCLE',
+      variant: 'v5',
+      sourceTraces: null,
+      data: {
+        page_id: ctx.pageId,
+        template_id: 'T-CIRCLE',
+        variant: 'v5',
+        grade: ctx.grade,
+        instruction: ctx.instructionText,
+        instruction_audio: ctx.instructionAudio,
+        select_mode: 'single',
+        options: t.options.map((w) => ({
+          content: w + '.webp',
+          label: w,
+          type: 'image',
+          audio: w + '.mp3',
+          correct: w === correct
+        }))
+      }
+    };
+  }
+
   function translateSortWords(topics, ctx) {
     const t = topics[0];
     if (!t || !Array.isArray(t.cardGroups)) {
@@ -792,6 +823,7 @@
     english_word_bank_cloze:        translateWordBankCloze,
     english_find_word:              translateFindWord,
     english_circle_word:            translateCircleWord,
+    english_circle_picture_rhyme:   translateCirclePictureRhyme,
     english_sort_words:             translateSortWords,
     english_sequence:               translateSequence,
     english_trace_letter:           translateTraceLetter,
@@ -859,6 +891,8 @@
       () => ({ templateId: 'T-FINDWORD', variantNumber: null, variantName: 'Find Words in Grid' }),
     english_circle_word:
       () => ({ templateId: 'T-CIRCLE', variantNumber: 3, variantName: 'Circle the Word (6 or 8 Cards, Multi-Select)' }),
+    english_circle_picture_rhyme:
+      () => ({ templateId: 'T-CIRCLE', variantNumber: 5, variantName: 'Circle Picture by Rhyme (4 Cards, Single-Select)' }),
     english_sort_words: (topics) => {
       const display = topics[0] && topics[0].cardDisplay;
       return display === 'letter'
@@ -943,6 +977,7 @@
       english_picture_spelling: 'Look at the picture. Write the word.',
       english_initial_sound_spelling: 'Look at the picture. Listen to the word. Write the first letter.',
       english_circle_picture: 'Listen to the word. Circle the picture.',
+      english_circle_picture_rhyme: 'Find a word that rhymes with the target. Circle the picture.',
       english_matching: 'Listen to the word. Draw a line to match.',
       english_onset_rime_blend: 'Tap each sound. Blend them together. Write the word.',
       english_phoneme_blend_picture: 'Listen to each sound. Blend and write the word.',
