@@ -778,6 +778,290 @@
     return 'spelling';
   }
 
+  // ---- v2606.04: new translators for remaining spec topicTypes ----
+
+  function translatePassage(topics, ctx) {
+    const t = topics[0];
+    if (!t || !t.reading) {
+      throw new Error('english_passage topic missing reading');
+    }
+    const r = t.reading;
+    const isWriteAnswer = t.variant === 'write_answer';
+    return {
+      kind: 'legacy',
+      templateId: 'T-PASSAGE',
+      variant: isWriteAnswer ? 'v2' : 'v1',
+      sourceTraces: null,
+      data: {
+        page_id: ctx.pageId,
+        template_id: 'T-PASSAGE',
+        variant: isWriteAnswer ? 'v2' : 'v1',
+        grade: ctx.grade,
+        instruction_text: ctx.instructionText,
+        instruction_audio: ctx.instructionAudio,
+        passage: {
+          title: r.title || '',
+          text: r.passageText || '',
+          image: Array.isArray(r.imageGroup) && r.imageGroup[0]
+            ? r.imageGroup[0] + '.webp'
+            : null
+        },
+        questions: (t.questions || []).map((q) => {
+          const isChoice = q.answerMode === 'choice';
+          const opts = isChoice && Array.isArray(q.options)
+            ? q.options.map((o) => ({ text: String(o), correct: String(o) === String(q.answer) }))
+            : null;
+          return {
+            question: q.prompt || '',
+            response_type: isChoice ? 'circle' : 'type',
+            options: opts,
+            answer: q.answer || '',
+            keywords: q.keywords || null
+          };
+        })
+      }
+    };
+  }
+
+  function translateCircleSentence(topics, ctx) {
+    const t = topics[0];
+    if (!t || !Array.isArray(t.sentences)) {
+      throw new Error('english_circle_sentence topic missing sentences');
+    }
+    const correct = new Set(t.correctIndexes || []);
+    return {
+      kind: 'legacy',
+      templateId: 'T-CIRCLE',
+      variant: 'v3',
+      sourceTraces: null,
+      data: {
+        page_id: ctx.pageId,
+        template_id: 'T-CIRCLE',
+        variant: 'v3',
+        grade: ctx.grade,
+        instruction: ctx.instructionText,
+        instruction_audio: ctx.instructionAudio,
+        select_mode: 'multi',
+        target_word: t.mainIdea || '',
+        options: t.sentences.map((s, i) => ({
+          content: s,
+          type: 'sentence',
+          correct: correct.has(i)
+        }))
+      }
+    };
+  }
+
+  function translateSentenceWordBank(topics, ctx) {
+    return {
+      kind: 'legacy',
+      templateId: 'T-SENTENCE',
+      variant: 'v1',
+      sourceTraces: topics.map(() => null),
+      data: {
+        page_id: ctx.pageId,
+        template_id: 'T-SENTENCE',
+        variant: 'v1',
+        grade: ctx.grade,
+        instruction_text: ctx.instructionText,
+        instruction_audio: ctx.instructionAudio,
+        prompts: topics.map((t) => ({
+          image: t.imageKey ? t.imageKey + '.webp' : null,
+          instruction: t.prompt || '',
+          word_bank: Array.isArray(t.wordBank) ? t.wordBank : [],
+          expected_sentences: 1
+        }))
+      }
+    };
+  }
+
+  function translatePictureSentence(topics, ctx) {
+    return {
+      kind: 'legacy',
+      templateId: 'T-SENTENCE',
+      variant: 'v2',
+      sourceTraces: topics.map(() => null),
+      data: {
+        page_id: ctx.pageId,
+        template_id: 'T-SENTENCE',
+        variant: 'v2',
+        grade: ctx.grade,
+        instruction_text: ctx.instructionText,
+        instruction_audio: ctx.instructionAudio,
+        prompts: topics.map((t) => ({
+          image: t.imageKey ? t.imageKey + '.webp' : null,
+          instruction: t.prompt || '',
+          expected_sentences: 2
+        }))
+      }
+    };
+  }
+
+  function translateSortFactOpinion(topics, ctx) {
+    const t = topics[0];
+    if (!t || !Array.isArray(t.cardGroups)) {
+      throw new Error('sort_fact_opinion topic missing cardGroups');
+    }
+    return {
+      kind: 'legacy',
+      templateId: 'T-SORT',
+      variant: 'v3',
+      sourceTraces: null,
+      data: {
+        page_id: ctx.pageId,
+        template_id: 'T-SORT',
+        variant: 'v3',
+        grade: ctx.grade,
+        instruction_text: ctx.instructionText,
+        instruction_audio: ctx.instructionAudio,
+        buckets: t.cardGroups.map((g, i) => ({
+          label: g.category || ('Group ' + (i + 1)),
+          id: 'b' + i
+        })),
+        cards: t.cardGroups.flatMap((g, i) =>
+          (g.cards || []).map((c) => ({
+            content: String(c),
+            type: 'sentence',
+            correct_bucket: 'b' + i
+          }))
+        )
+      }
+    };
+  }
+
+  function translateDictationSpelling(topics, ctx) {
+    return {
+      kind: 'legacy',
+      templateId: 'T-WRITE',
+      variant: 'v3',
+      sourceTraces: topics.map((t) => t.source_trace || null),
+      data: {
+        page_id: ctx.pageId,
+        template_id: 'T-WRITE',
+        variant: 'v3',
+        grade: ctx.grade,
+        instruction_text: ctx.instructionText,
+        instruction_audio: ctx.instructionAudio,
+        cell_size: 48,
+        items: topics.map((t) => ({
+          prompt_image: null,
+          prompt_audio: (t.word || '') + '.mp3',
+          hint: null,
+          answer: t.answer || t.word || ''
+        }))
+      }
+    };
+  }
+
+  function translateDefinitionSpelling(topics, ctx) {
+    return {
+      kind: 'legacy',
+      templateId: 'T-WRITE',
+      variant: 'v4',
+      sourceTraces: topics.map((t) => t.source_trace || null),
+      data: {
+        page_id: ctx.pageId,
+        template_id: 'T-WRITE',
+        variant: 'v4',
+        grade: ctx.grade,
+        instruction_text: ctx.instructionText,
+        instruction_audio: ctx.instructionAudio,
+        cell_size: 48,
+        items: topics.map((t) => ({
+          prompt_image: null,
+          prompt_audio: t.clueAudio ? t.clueAudio + '.mp3' : null,
+          hint: t.clueText || null,
+          answer: t.answer || t.word || ''
+        }))
+      }
+    };
+  }
+
+  function translatePhonemeBlendAuditory(topics, ctx) {
+    const t = topics[0];
+    if (!t || !Array.isArray(t.rows)) {
+      throw new Error('phoneme_blend_auditory topic missing rows');
+    }
+    return {
+      kind: 'legacy',
+      templateId: 'T-BLEND',
+      variant: 'v3',
+      sourceTraces: t.rows.map(() => null),
+      data: {
+        page_id: ctx.pageId,
+        template_id: 'T-BLEND',
+        variant: 'v3',
+        grade: ctx.grade,
+        instruction_text: ctx.instructionText,
+        instruction_audio: ctx.instructionAudio,
+        cell_size: 48,
+        items: t.rows.map((r) => {
+          const ids = (Array.isArray(r.phoneme_ids) && r.phoneme_ids.length === (r.phonemes || []).length)
+            ? r.phoneme_ids
+            : (r.phonemes || []);
+          return {
+            phoneme_audios: ids.map((p) => 'phoneme:' + p + '.mp3'),
+            phoneme_labels: (r.phonemes || []).map((p) => '/' + p + '/'),
+            image: null,
+            answer: r.answer || r.word
+          };
+        })
+      }
+    };
+  }
+
+  function translatePrefixSuffixAdd(topics, ctx) {
+    const t = topics[0];
+    if (!t || !Array.isArray(t.rows)) {
+      throw new Error('prefix_suffix_add topic missing rows');
+    }
+    const isPrefix = t.kind === 'prefix';
+    return {
+      kind: 'legacy',
+      templateId: 'T-FILLIN',
+      variant: 'v4',
+      sourceTraces: t.rows.map(() => null),
+      data: {
+        page_id: ctx.pageId,
+        template_id: 'T-FILLIN',
+        variant: 'v4',
+        grade: ctx.grade,
+        instruction_text: ctx.instructionText,
+        instruction_audio: ctx.instructionAudio,
+        cell_size: 36,
+        items: t.rows.map((r) => ({
+          display: isPrefix ? ('_' + (r.root || '')) : ((r.root || '') + '_'),
+          blank_position: isPrefix ? 0 : 1,
+          blank_length: (r.answer || '').length || 1,
+          answer: r.answer || '',
+          hint: r.hint || null
+        }))
+      }
+    };
+  }
+
+  function translateDictation(topics, ctx) {
+    return {
+      kind: 'legacy',
+      templateId: 'T-DICTATION',
+      variant: 'v1',
+      sourceTraces: topics.map(() => null),
+      data: {
+        page_id: ctx.pageId,
+        template_id: 'T-DICTATION',
+        variant: 'v1',
+        grade: ctx.grade,
+        instruction_text: ctx.instructionText,
+        instruction_audio: ctx.instructionAudio,
+        items: topics.map((t) => ({
+          audio: (t.audio || t.audioKey || '') + '.mp3',
+          sentence: t.sentence || '',
+          answer: t.answer || t.sentence || ''
+        }))
+      }
+    };
+  }
+
   const TOPIC_TRANSLATORS = {
     english_sound_box_full:                 translateSoundBoxFull,
     english_sound_box_digraph_full:         translateSoundBoxFull,         // K-3+ digraph variant — reuses Full translator (answer array allows digraph element per cell)
@@ -799,7 +1083,18 @@
     // v2605.25: unified english_transform (displayType branch) + english_ladder (flat)
     english_transform:              translateTransform,
     english_ladder:                 translateLadder,
-    english_fixup:                  translateFixup
+    english_fixup:                  translateFixup,
+    // v2606.04: remaining spec topicTypes
+    english_passage:                translatePassage,
+    english_circle_sentence:        translateCircleSentence,
+    english_sentence_word_bank:     translateSentenceWordBank,
+    english_picture_sentence:       translatePictureSentence,
+    english_sort_fact_opinion:      translateSortFactOpinion,
+    english_dictation_spelling:     translateDictationSpelling,
+    english_definition_spelling:    translateDefinitionSpelling,
+    english_phoneme_blend_auditory: translatePhonemeBlendAuditory,
+    english_prefix_suffix_add:      translatePrefixSuffixAdd,
+    english_dictation:              translateDictation
   };
 
   // ============ Template / variant labels (SSOT: Bitable 題型 Template 表) ============
@@ -912,7 +1207,32 @@
         : { templateId: 'T-LADDER', variantNumber: 1, variantName: 'Word Family Ladder - Full Picture Support (2 Ladders, 3 Rungs Each)' };
     },
     english_fixup:
-      () => ({ templateId: 'T-FIXUP', variantNumber: 1, variantName: 'Fix the Mistakes - Capitalization & Punctuation' })
+      () => ({ templateId: 'T-FIXUP', variantNumber: 1, variantName: 'Fix the Mistakes - Capitalization & Punctuation' }),
+    // v2606.04: remaining spec topicTypes
+    english_passage: (topics) => {
+      const v = topics[0] && topics[0].variant;
+      return v === 'write_answer'
+        ? { templateId: 'T-PASSAGE', variantNumber: 2, variantName: 'Reading Comprehension - Write the Answer (3 Questions)' }
+        : { templateId: 'T-PASSAGE', variantNumber: 1, variantName: 'Reading Comprehension - Multiple Choice (3 Questions)' };
+    },
+    english_circle_sentence:
+      () => ({ templateId: 'T-CIRCLE', variantNumber: 4, variantName: 'Circle Sentences by Main Idea (6 Cards, Multi-Select)' }),
+    english_sentence_word_bank:
+      () => ({ templateId: 'T-SENTENCE', variantNumber: 1, variantName: 'Sentence with Word Bank (x2, 1 Sentence per Item)' }),
+    english_picture_sentence:
+      () => ({ templateId: 'T-SENTENCE', variantNumber: 2, variantName: 'Picture Sentence Writing (x2, 2 Sentences per Item)' }),
+    english_sort_fact_opinion:
+      () => ({ templateId: 'T-SORT', variantNumber: 3, variantName: 'Sort Fact vs Opinion (2 Buckets, 4 Cards)' }),
+    english_dictation_spelling:
+      () => ({ templateId: 'T-SPELL', variantNumber: 3, variantName: 'Dictation Spelling (4 Cells)' }),
+    english_definition_spelling:
+      () => ({ templateId: 'T-SPELL', variantNumber: 4, variantName: 'Definition Spelling (2 Cells)' }),
+    english_phoneme_blend_auditory:
+      () => ({ templateId: 'T-BLEND', variantNumber: 3, variantName: 'Phoneme Blend - Auditory Only (2 Rows)' }),
+    english_prefix_suffix_add:
+      () => ({ templateId: 'T-FILLIN', variantNumber: 2, variantName: 'Prefix / Suffix Add (4 Rows)' }),
+    english_dictation:
+      () => ({ templateId: 'T-DICTATION', variantNumber: 1, variantName: 'Listen and Type Sentence (x3)' })
   };
 
   function resolveTemplateMeta(topicType, topics) {
@@ -955,7 +1275,17 @@
       english_shadow_writing: 'Trace each letter along the shadow.',
       english_transform: 'Add a silent e. Write the new word!',
       english_ladder: 'Climb the ladder! Change the first letter to make new words.',
-      english_fixup: 'Circle the mistakes. Then write the correct sentence.'
+      english_fixup: 'Circle the mistakes. Then write the correct sentence.',
+      english_passage: 'Read the story. Answer the questions.',
+      english_circle_sentence: 'Circle ALL the sentences that tell about the main idea.',
+      english_sentence_word_bank: 'Use the words to write a sentence about the picture.',
+      english_picture_sentence: 'Look at each picture. Write two sentences about it.',
+      english_sort_fact_opinion: 'Is it a fact or an opinion? Sort each sentence.',
+      english_dictation_spelling: 'Listen to the word. Write it.',
+      english_definition_spelling: 'Read the clue. Write the word.',
+      english_phoneme_blend_auditory: 'Listen to all the sounds. Blend and write the word.',
+      english_prefix_suffix_add: 'Add the correct prefix or suffix.',
+      english_dictation: 'Listen to the sentence. Type it exactly as you hear it.'
     };
     const pageInstr = page && page.instructionText;
     const topicInstr = topics[0] && topics[0].instructionText;
