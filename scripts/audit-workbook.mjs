@@ -40,7 +40,14 @@ function resolveAudioCategory(name, M, hint) {
   if (!name) return null;
   const tryCat = {
     phoneme:     () => (M.phonemes && M.phonemes[name]) ? 'phoneme' : null,
-    word:        () => (M.words && M.words[name] && M.words[name].audio) ? 'word' : null,
+    word:        () => {
+      if (M.words && M.words[name] && M.words[name].audio) return 'word';
+      // case-insensitive fallback for proper nouns (Fred/fred, June/june)
+      const alt = /^[A-Z]/.test(name) ? name[0].toLowerCase() + name.slice(1)
+                : name[0].toUpperCase() + name.slice(1);
+      if (M.words && M.words[alt] && M.words[alt].audio) return 'word';
+      return null;
+    },
     rime:        () => (M.rimes && M.rimes[name]) ? 'rime' : null,
     instruction: () => (M.instructions && M.instructions[name]) ? 'instruction' : null,
     letter:      () => {
@@ -61,7 +68,15 @@ function resolveAudioCategory(name, M, hint) {
 }
 
 function resolveImage(word, M) {
-  return !!(M.words && M.words[word] && M.words[word].image);
+  if (M.words && M.words[word] && M.words[word].image) return true;
+  if (M.panels && M.panels[word] && M.panels[word].image) return true;
+  // case-insensitive fallback for proper nouns (Fred/fred, June/june)
+  if (M.words) {
+    const alt = /^[A-Z]/.test(word) ? word[0].toLowerCase() + word.slice(1)
+              : word[0].toUpperCase() + word.slice(1);
+    if (M.words[alt] && M.words[alt].image) return true;
+  }
+  return false;
 }
 
 // ---------- Per-topicType expectation extractor ----------
@@ -347,6 +362,82 @@ const EXTRACTORS = {
     // K-3+ digraph variant — same renderer expectations as single-letter full:
     // one word audio + one word image per item.
     return EXTRACTORS.english_sound_box_full(t);
+  },
+
+  // v2606.04: remaining spec topicTypes
+
+  english_passage(t) {
+    const imgs = [];
+    if (t.reading && Array.isArray(t.reading.imageGroup)) {
+      t.reading.imageGroup.forEach((key, i) => {
+        if (key) imgs.push({ slot: `reading.imageGroup[${i}]`, word: key });
+      });
+    }
+    return { templateId: 'T-PASSAGE', expectations: [], images: imgs };
+  },
+
+  english_circle_sentence(t) {
+    return { templateId: 'T-CIRCLE', expectations: [], images: [] };
+  },
+
+  english_sentence_word_bank(t) {
+    const imgs = [];
+    if (t.imageKey) imgs.push({ slot: 'imageKey', word: t.imageKey });
+    return { templateId: 'T-SENTENCE', expectations: [], images: imgs };
+  },
+
+  english_picture_sentence(t) {
+    const imgs = [];
+    if (t.imageKey) imgs.push({ slot: 'imageKey', word: t.imageKey });
+    return { templateId: 'T-SENTENCE', expectations: [], images: imgs };
+  },
+
+  english_sort_fact_opinion(t) {
+    return { templateId: 'T-SORT', expectations: [], images: [] };
+  },
+
+  english_dictation_spelling(t) {
+    if (!t.word) return { issues: [{ kind: 'translator_error', msg: 'missing word' }] };
+    return {
+      templateId: 'T-WRITE',
+      expectations: [
+        { slot: 'item.audio', label: t.word, audioName: t.word, expectCategory: 'word' }
+      ],
+      images: []
+    };
+  },
+
+  english_definition_spelling(t) {
+    if (!t.word) return { issues: [{ kind: 'translator_error', msg: 'missing word' }] };
+    const exp = [];
+    if (t.clueAudio) exp.push({ slot: 'clue.audio', label: t.clueAudio, audioName: t.clueAudio, expectCategory: 'instruction' });
+    return { templateId: 'T-WRITE', expectations: exp, images: [] };
+  },
+
+  english_phoneme_blend_auditory(t) {
+    if (!Array.isArray(t.rows)) return { issues: [{ kind: 'translator_error', msg: 'missing rows' }] };
+    const exp = [];
+    t.rows.forEach((r, ri) => {
+      const ids = (Array.isArray(r.phoneme_ids) && r.phoneme_ids.length === (r.phonemes || []).length)
+        ? r.phoneme_ids : (r.phonemes || []);
+      ids.forEach((p, pi) => {
+        exp.push({ slot: `row[${ri}].phoneme[${pi}]`, label: p, audioName: p, expectCategory: 'phoneme' });
+      });
+    });
+    return { templateId: 'T-BLEND', expectations: exp, images: [] };
+  },
+
+  english_prefix_suffix_add(t) {
+    return { templateId: 'T-FILLIN', expectations: [], images: [] };
+  },
+
+  english_dictation(t) {
+    const exp = [];
+    if (t.audio || t.audioKey) {
+      const name = t.audio || t.audioKey;
+      exp.push({ slot: 'item.audio', label: name, audioName: name, expectCategory: 'instruction' });
+    }
+    return { templateId: 'T-DICTATION', expectations: exp, images: [] };
   }
 };
 

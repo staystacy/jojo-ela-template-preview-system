@@ -53,6 +53,7 @@ function scanAssetManifest() {
   const AUDIO_RE = /^([^.]+)\.(mp3|wav|m4a)$/i;
 
   const wordImageNames        = scanDir(path.join(ASSETS_DIR, 'images', 'word'),         IMG_RE);
+  const panelImageNames       = scanDir(path.join(ASSETS_DIR, 'images', 'panel'),        IMG_RE);
   const wordAudioNames        = scanDir(path.join(ASSETS_DIR, 'audio',  'word'),         AUDIO_RE);
   const letterAudioNames      = scanDir(path.join(ASSETS_DIR, 'audio',  'letter'),       AUDIO_RE);
   const rimeAudioNames        = scanDir(path.join(ASSETS_DIR, 'audio',  'rime'),         AUDIO_RE);
@@ -78,10 +79,14 @@ function scanAssetManifest() {
   const instructions = {};
   instructionAudioNames.forEach((k) => { instructions[k] = { audio: true }; });
 
+  const panels = {};
+  panelImageNames.forEach((p) => { panels[p] = { image: true }; });
+
   return {
     generated_at: new Date().toISOString(),
     total: Object.keys(words).length,
     words,
+    panels,
     letters,
     rimes,
     phonemes,
