@@ -183,6 +183,17 @@ const EXTRACTORS = {
     return { templateId: 'T-CIRCLE', expectations: exp, images: imgs };
   },
 
+  english_circle_picture_rhyme(t) {
+    const opts = t.options || [];
+    const exp = [];
+    const imgs = [];
+    opts.forEach((w, i) => {
+      exp.push({ slot: `option[${i}].audio`, label: w, audioName: w, expectCategory: 'word' });
+      imgs.push({ slot: `option[${i}].image`, word: w });
+    });
+    return { templateId: 'T-CIRCLE', expectations: exp, images: imgs };
+  },
+
   english_matching(t) {
     if (!t.topItems || !t.bottomItems || !t.correctPairs) {
       return { issues: [{ kind: 'translator_error', msg: 'missing topItems/bottomItems/correctPairs' }] };
