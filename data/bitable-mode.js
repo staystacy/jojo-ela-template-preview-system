@@ -674,7 +674,8 @@
         demo_area: {
           content: letter,
           animation: 'stroke_order',
-          audio: 'letter:' + letter.toLowerCase() + '.mp3',
+          // mixed-case letter ("Ff") → first char for letter audio (f.mp3, not ff.mp3)
+          audio: 'letter:' + letter[0].toLowerCase() + '.mp3',
           image: null,
           wordCards: (t.wordList || []).filter(Boolean).map(w => ({
             word: w, image: w + '.webp', audio: w + '.mp3'
