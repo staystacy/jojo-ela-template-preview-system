@@ -106,6 +106,24 @@ window.JOJO_RENDERERS['T-TRACE'] = function (data, container) {
       demoPanel.appendChild(img);
     }
 
+    // Word cards (shadow_writing): render every configured wordList entry as a
+    // picture + label + audio card, stacked under the letter demo (matches App).
+    if (Array.isArray(data.demo_area.wordCards) && data.demo_area.wordCards.length) {
+      data.demo_area.wordCards.forEach(function (wc, wi) {
+        var card = document.createElement('div');
+        card.className = 'ws-option-card';
+        card.style.gap = '6px';
+        card.appendChild(R.imagePlaceholder(wc.image, 80, 60));
+        var cLabel = document.createElement('span');
+        cLabel.className = 'ws-option-card-text';
+        cLabel.textContent = wc.word;
+        card.appendChild(cLabel);
+        if (wc.audio) card.appendChild(R.audioButton(wc.audio));
+        R.annotate(card, 'demo_area.wordCards[' + wi + ']');
+        demoPanel.appendChild(card);
+      });
+    }
+
     R.annotate(demoPanel, 'demo_area');
   }
 

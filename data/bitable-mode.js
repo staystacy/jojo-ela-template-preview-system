@@ -676,7 +676,9 @@
           animation: 'stroke_order',
           audio: 'letter:' + letter.toLowerCase() + '.mp3',
           image: null,
-          word: (t.wordList && t.wordList[0]) || null
+          wordCards: (t.wordList || []).filter(Boolean).map(w => ({
+            word: w, image: w + '.webp', audio: w + '.mp3'
+          }))
         },
         cells: Array.from({ length: 10 }, () => ({ scaffold: 'faded', content: letter }))
       }
