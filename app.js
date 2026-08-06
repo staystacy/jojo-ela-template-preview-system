@@ -15,6 +15,8 @@
       workbooks: [],
       workbookTitles: {},
       _allUnits: [],
+      _allCourses: [],
+      _activeSource: 'curriculum',
       unitCode: null,
       unitData: null,
       pageIndex: 0,
@@ -212,12 +214,24 @@
   var btPhVariantName = document.getElementById('bt-ph-variant-name');
   var btPhSubtitle = document.getElementById('bt-ph-subtitle');
   var btPhSubtitleWrap = document.getElementById('bt-ph-subtitle-wrap');
+  var btSourceTabs = document.querySelectorAll('#bt-source-tabs .bt-tab');
+  var btUnitLabel = document.getElementById('bt-unit-label');
+  var btSourceBadge = document.getElementById('bt-ph-source-badge');
   var btPhOverall = document.getElementById('bt-ph-overall');
   var btPhOverallTotal = document.getElementById('bt-ph-overall-total');
   var btPhOverallWrap = document.getElementById('bt-ph-overall-wrap');
   var btPhFilename = document.getElementById('bt-ph-filename');
   var demoSidebarBlock = document.getElementById('demo-sidebar-block');
   var jsonModeToggleEl = document.getElementById('json-mode-toggle');
+  var COURSE_TITLES = {
+    'B1': 'Phonics Inflections',
+    'B2': 'Grammar Foundations',
+    'B3': 'Reading Fluency',
+    'C1': 'Advanced Phonics',
+    'C2': 'Comprehension',
+    'D1': 'Writing Skills',
+    'D2': 'Language Arts Review'
+  };
   var assetManifestLoaded = false;
 
   // ========== Init ==========
@@ -235,6 +249,44 @@
       if (!wb) return;
       state.bitable.workbook = wb;
       populateUnitSelector();
+    });
+    btSourceTabs.forEach(function (tab) {
+      tab.addEventListener('click', function () {
+        var src = tab.dataset.source;
+        setSourceTab(src);
+        var books = src === 'curriculum' ? state.bitable._allCourses : state.bitable.workbooks;
+        state.bitable.workbook = books[0] || null;
+        populateBookSelector(src);
+        if (state.bitable.workbook) {
+          btWorkbookSel.value = state.bitable.workbook;
+          populateUnitSelector();
+        }
+      });
+    });
+  }
+
+  function setSourceTab(source) {
+    btSourceTabs.forEach(function (tab) {
+      tab.classList.toggle('active', tab.dataset.source === source);
+    });
+    state.bitable._activeSource = source;
+    btUnitLabel.textContent = source === 'curriculum' ? 'Station' : 'Unit';
+  }
+
+  function populateBookSelector(source) {
+    btWorkbookSel.innerHTML = '';
+    var books = source === 'curriculum' ? state.bitable._allCourses : state.bitable.workbooks;
+    books.forEach(function (bk) {
+      var opt = document.createElement('option');
+      opt.value = bk;
+      if (source === 'curriculum') {
+        var ct = COURSE_TITLES[bk];
+        opt.textContent = ct ? (bk + ' — ' + ct) : bk;
+      } else {
+        var meta = state.bitable.workbookTitles[bk];
+        opt.textContent = meta && meta.title ? (bk + ' — ' + meta.title) : bk;
+      }
+      btWorkbookSel.appendChild(opt);
     });
   }
 
@@ -580,26 +632,40 @@
         if (!resp.ok) throw new Error(resp.body && resp.body.error || 'units fetch failed');
         state.bitable._allUnits = resp.body.units || [];
         state.bitable.workbooks = resp.body.workbooks || [];
+        state.bitable._allCourses = resp.body.courses || [];
         state.bitable.workbookTitles = resp.body.workbook_titles || {};
 
-        // Populate workbook selector with readable name
-        btWorkbookSel.innerHTML = '';
-        state.bitable.workbooks.forEach(function (wb) {
-          var opt = document.createElement('option');
-          opt.value = wb;
-          var meta = state.bitable.workbookTitles[wb];
-          opt.textContent = meta && meta.title ? (wb + ' — ' + meta.title) : wb;
-          btWorkbookSel.appendChild(opt);
+        // Update tab count badges
+        btSourceTabs.forEach(function (tab) {
+          if (tab.dataset.source === 'curriculum') {
+            tab.setAttribute('data-count', '(' + state.bitable._allCourses.length + ')');
+          } else {
+            tab.setAttribute('data-count', '(' + state.bitable.workbooks.length + ')');
+          }
         });
 
-        // Try restoring from URL hash before defaulting to first workbook
+        // Determine which source tab to activate based on hash or default
         var hashTarget = parseHash();
-        var hashWorkbook = hashTarget && hashTarget.unitCode.split('_U')[0];
+        var matchedUnit = hashTarget && state.bitable._allUnits.find(function (u) { return u.unit_code === hashTarget.unitCode; });
+        var hashWorkbook = matchedUnit ? matchedUnit.workbook : (hashTarget ? hashTarget.unitCode.split('_U')[0] : null);
+        var activeSource = 'curriculum';
         if (hashWorkbook && state.bitable.workbooks.indexOf(hashWorkbook) !== -1) {
-          state.bitable.workbook = hashWorkbook;
-        } else if (!state.bitable.workbook || state.bitable.workbooks.indexOf(state.bitable.workbook) === -1) {
-          state.bitable.workbook = state.bitable.workbooks[0] || null;
+          activeSource = 'library';
+        } else if (hashWorkbook && state.bitable._allCourses.indexOf(hashWorkbook) !== -1) {
+          activeSource = 'curriculum';
+        } else if (state.bitable._allCourses.length === 0) {
+          activeSource = 'library';
         }
+        setSourceTab(activeSource);
+
+        // Set workbook from hash or default to first in active tab
+        var tabBooks = activeSource === 'curriculum' ? state.bitable._allCourses : state.bitable.workbooks;
+        if (hashWorkbook && tabBooks.indexOf(hashWorkbook) !== -1) {
+          state.bitable.workbook = hashWorkbook;
+        } else {
+          state.bitable.workbook = tabBooks[0] || null;
+        }
+        populateBookSelector(activeSource);
         if (state.bitable.workbook) btWorkbookSel.value = state.bitable.workbook;
 
         populateUnitSelector(hashTarget);
@@ -698,6 +764,12 @@
 
     window.JOJO_BITABLE.renderPage(translated, worksheetEl);
 
+    // Source badge
+    var isCourse = state.bitable._allCourses.indexOf(unit.workbook) !== -1;
+    btSourceBadge.textContent = isCourse ? 'Course' : 'Library';
+    btSourceBadge.className = 'bt-source-badge ' + (isCourse ? 'badge-course' : 'badge-library');
+    btSourceBadge.hidden = false;
+
     // Update page header
     btPhUnit.textContent = unit.unit_code;
     btPhPage.textContent = String(idx + 1);
@@ -792,7 +864,7 @@
 
   function parseHash() {
     var raw = (window.location.hash || '').replace(/^#/, '');
-    var m = raw.match(/^bitable\/([A-Za-z0-9_-]+_U\d+)\/(\d+)$/);
+    var m = raw.match(/^bitable\/([A-Za-z0-9_-]+)\/(\d+)$/);
     if (!m) return null;
     return { unitCode: m[1], pageIndex: Math.max(0, parseInt(m[2], 10) - 1) };
   }

@@ -26,6 +26,8 @@ const PAGES_DIR  = process.env.PAGES_DIR
   || '/Users/stacywang/Desktop/JOJO-Worksheet-Research/03-Preview-Tool/data/workbooks';
 const NAMING_CSV = process.env.NAMING_CSV
   || '/Users/stacywang/Desktop/JOJO-Worksheet-Research/Framework/assets/naming.csv';
+const COURSE_DIR = process.env.COURSE_DIR
+  || '/Users/stacywang/Desktop/JOJO-Worksheet-Research/03b-Course-Page-JSON';
 
 // ---------- Boot: scan asset manifest ----------
 // New layout (May 2026): 10-Final-Assets/
@@ -54,11 +56,13 @@ function scanAssetManifest() {
 
   const wordImageNames        = scanDir(path.join(ASSETS_DIR, 'images', 'word'),         IMG_RE);
   const panelImageNames       = scanDir(path.join(ASSETS_DIR, 'images', 'panel'),        IMG_RE);
+  const sceneImageNames       = scanDir(path.join(ASSETS_DIR, 'images', 'scene'),        IMG_RE);
   const wordAudioNames        = scanDir(path.join(ASSETS_DIR, 'audio',  'word'),         AUDIO_RE);
   const letterAudioNames      = scanDir(path.join(ASSETS_DIR, 'audio',  'letter'),       AUDIO_RE);
   const rimeAudioNames        = scanDir(path.join(ASSETS_DIR, 'audio',  'rime'),         AUDIO_RE);
   const phonemeAudioNames     = scanDir(path.join(ASSETS_DIR, 'audio',  'phoneme'),      AUDIO_RE);
   const instructionAudioNames = scanDir(path.join(ASSETS_DIR, 'audio',  'instruction'),  AUDIO_RE);
+  const sentenceAudioNames   = scanDir(path.join(ASSETS_DIR, 'audio',  'sentence'),     AUDIO_RE);
 
   const words = {};
   function ensure(w) { if (!words[w]) words[w] = { image: false, audio: false }; return words[w]; }
@@ -79,18 +83,27 @@ function scanAssetManifest() {
   const instructions = {};
   instructionAudioNames.forEach((k) => { instructions[k] = { audio: true }; });
 
+  // Sentence / clue audio (T-SPELL definition clues, T-DICTATION sentences, etc.)
+  const sentences = {};
+  sentenceAudioNames.forEach((s) => { sentences[s] = { audio: true }; });
+
   const panels = {};
   panelImageNames.forEach((p) => { panels[p] = { image: true }; });
+
+  const scenes = {};
+  sceneImageNames.forEach((s) => { scenes[s] = { image: true }; });
 
   return {
     generated_at: new Date().toISOString(),
     total: Object.keys(words).length,
     words,
     panels,
+    scenes,
     letters,
     rimes,
     phonemes,
-    instructions
+    instructions,
+    sentences
   };
 }
 
@@ -153,7 +166,10 @@ function getAssetManifest() {
   const rimeCount = Object.keys(m.rimes || {}).length;
   const phonemeCount = Object.keys(m.phonemes || {}).length;
   const instructionCount = Object.keys(m.instructions || {}).length;
-  console.log(`[server] asset manifest: ${m.total} words (${imageCount} img, ${audioCount} audio) · ${letterCount} letter · ${rimeCount} rime · ${phonemeCount} phoneme · ${instructionCount} instruction`);
+  const sentenceCount = Object.keys(m.sentences || {}).length;
+  const panelCount = Object.keys(m.panels || {}).length;
+  const sceneCount = Object.keys(m.scenes || {}).length;
+  console.log(`[server] asset manifest: ${m.total} words (${imageCount} img, ${audioCount} audio) · ${panelCount} panel · ${sceneCount} scene · ${letterCount} letter · ${rimeCount} rime · ${phonemeCount} phoneme · ${instructionCount} instruction · ${sentenceCount} sentence`);
 }
 
 // ---------- Filesystem-backed unit catalog ----------
@@ -194,28 +210,85 @@ function scanWorkbooks() {
   return units;
 }
 
+function scanCoursePages() {
+  try {
+    if (!fs.existsSync(COURSE_DIR)) return [];
+  } catch (e) {
+    return [];
+  }
+  const units = [];
+  const bookDirs = fs.readdirSync(COURSE_DIR, { withFileTypes: true })
+    .filter((d) => d.isDirectory()).map((d) => d.name);
+  for (const book of bookDirs) {
+    const bookPath = path.join(COURSE_DIR, book);
+    const bankDirs = fs.readdirSync(bookPath, { withFileTypes: true })
+      .filter((d) => d.isDirectory()).map((d) => d.name);
+    for (const bank of bankDirs) {
+      const bankPath = path.join(bookPath, bank);
+      const stationDirs = fs.readdirSync(bankPath, { withFileTypes: true })
+        .filter((d) => d.isDirectory()).map((d) => d.name);
+      for (const stationId of stationDirs) {
+        const stationPath = path.join(bankPath, stationId);
+        const pageFiles = fs.readdirSync(stationPath)
+          .filter((f) => /^P\d+\.json$/.test(f))
+          .sort();
+        if (pageFiles.length === 0) continue;
+        units.push({
+          unit_code: stationId,
+          workbook: book,
+          page_count: pageFiles.length,
+          files: pageFiles,
+          source: 'curriculum',
+          bank: bank
+        });
+      }
+    }
+  }
+  units.sort((a, b) => a.unit_code.localeCompare(b.unit_code));
+  return units;
+}
+
 function loadUnit(code) {
-  const meta = scanWorkbooks().find((u) => u.unit_code === code);
-  if (!meta) return null;
+  // Try library first
+  const libMeta = scanWorkbooks().find((u) => u.unit_code === code);
+  if (libMeta) {
+    const pages = [];
+    for (const f of libMeta.files) {
+      const fpath = path.join(PAGES_DIR, libMeta.workbook, f);
+      try {
+        pages.push(JSON.parse(fs.readFileSync(fpath, 'utf8')));
+      } catch (e) {
+        pages.push({ _parseError: e.message, _sourceFile: f, pageNumber: pages.length + 1 });
+      }
+    }
+    return {
+      unit_code: libMeta.unit_code,
+      workbook: libMeta.workbook,
+      page_count: libMeta.page_count,
+      pages,
+      source_files: libMeta.files.map((f) => '/data/workbooks/' + libMeta.workbook + '/' + f),
+      fetched_at: new Date().toISOString()
+    };
+  }
+
+  // Try curriculum
+  const curMeta = scanCoursePages().find((u) => u.unit_code === code);
+  if (!curMeta) return null;
   const pages = [];
-  for (const f of meta.files) {
-    const fpath = path.join(PAGES_DIR, meta.workbook, f);
+  for (const f of curMeta.files) {
+    const fpath = path.join(COURSE_DIR, curMeta.workbook, curMeta.bank, curMeta.unit_code, f);
     try {
       pages.push(JSON.parse(fs.readFileSync(fpath, 'utf8')));
     } catch (e) {
-      pages.push({
-        _parseError: e.message,
-        _sourceFile: f,
-        pageNumber: pages.length + 1
-      });
+      pages.push({ _parseError: e.message, _sourceFile: f, pageNumber: pages.length + 1 });
     }
   }
   return {
-    unit_code: meta.unit_code,
-    workbook: meta.workbook,
-    page_count: meta.page_count,
+    unit_code: curMeta.unit_code,
+    workbook: curMeta.workbook,
+    page_count: curMeta.page_count,
     pages,
-    source_files: meta.files.map((f) => '/data/workbooks/' + meta.workbook + '/' + f),
+    source_files: curMeta.files.map((f) => '/data/course/' + curMeta.workbook + '/' + curMeta.bank + '/' + curMeta.unit_code + '/' + f),
     fetched_at: new Date().toISOString()
   };
 }
@@ -228,6 +301,19 @@ try {
 } catch (e) {
   console.error('[server] FATAL:', e.message);
   process.exit(1);
+}
+
+// Boot-time scan: curriculum course pages
+try {
+  const courseUnits = scanCoursePages();
+  if (courseUnits.length > 0) {
+    const courseBooks = [...new Set(courseUnits.map((u) => u.workbook))];
+    console.log(`[server] course_dir: ${courseUnits.length} stations across ${courseBooks.length} books (${courseBooks.join(', ')})`);
+  } else {
+    console.log('[server] course_dir: no stations found');
+  }
+} catch (e) {
+  console.warn('[server] course_dir scan failed:', e.message);
 }
 
 // ---------- App ----------
@@ -247,6 +333,9 @@ app.use('/assets', express.static(ASSETS_DIR));
 // Static: workbook JSON files (so "Open JSON" link in UI works)
 app.use('/data/workbooks', express.static(PAGES_DIR));
 
+// Static: curriculum course JSON files
+app.use('/data/course', express.static(COURSE_DIR));
+
 // ---------- API ----------
 app.get('/api/asset-manifest', (_req, res) => {
   res.json(getAssetManifest());
@@ -254,17 +343,22 @@ app.get('/api/asset-manifest', (_req, res) => {
 
 app.get('/api/units', (req, res) => {
   try {
-    const all = scanWorkbooks();
+    const libUnits = scanWorkbooks().map((u) => ({ ...u, source: 'library' }));
+    const curUnits = scanCoursePages();
+    const all = [...libUnits, ...curUnits];
     const workbookFilter = req.query.workbook;
     const filtered = workbookFilter ? all.filter((r) => r.workbook === workbookFilter) : all;
-    const workbooks = [...new Set(all.map((u) => u.workbook))].sort();
+    const workbooks = [...new Set(libUnits.map((u) => u.workbook))].sort();
+    const courses = [...new Set(curUnits.map((u) => u.workbook))].sort();
     res.json({
       workbooks,
+      courses,
       workbook_titles: workbookTitles,
       units: filtered.map((r) => ({
         unit_code: r.unit_code,
         workbook: r.workbook,
-        page_count: r.page_count
+        page_count: r.page_count,
+        source: r.source || 'library'
       }))
     });
   } catch (e) {
@@ -295,5 +389,6 @@ function sendFsError(res, err) {
 app.listen(PORT, () => {
   console.log(`[server] listening on http://localhost:${PORT}`);
   console.log(`[server] pages_dir=${PAGES_DIR}`);
+  console.log(`[server] course_dir=${COURSE_DIR}`);
   console.log(`[server] assets_dir=${ASSETS_DIR}`);
 });

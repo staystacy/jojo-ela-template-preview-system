@@ -33,7 +33,18 @@ window.JOJO_RENDERERS['T-PASSAGE'] = function (data, container) {
       passageCol.appendChild(title);
     }
 
-    if (data.passage.image) {
+    if (data.passage.images && data.passage.images.length > 1) {
+      var imgStrip = document.createElement('div');
+      imgStrip.style.display = 'flex';
+      imgStrip.style.gap = '6px';
+      imgStrip.style.marginBottom = '10px';
+      data.passage.images.forEach(function (fname, i) {
+        var img = R.imagePlaceholder(fname, 100, 75);
+        R.annotate(img, 'passage.images[' + i + ']');
+        imgStrip.appendChild(img);
+      });
+      passageCol.appendChild(imgStrip);
+    } else if (data.passage.image) {
       var img = R.imagePlaceholder(data.passage.image, 200, 120);
       R.annotate(img, 'passage.image');
       passageCol.appendChild(img);

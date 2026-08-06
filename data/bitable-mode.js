@@ -116,6 +116,8 @@
                           ? '/assets/audio/rime/' + name + '.' + ext : null,
       instruction: () => (M.instructions && M.instructions[name] && M.instructions[name].audio)
                           ? '/assets/audio/instruction/' + name + '.' + ext : null,
+      sentence:    () => (M.sentences && M.sentences[name] && M.sentences[name].audio)
+                          ? '/assets/audio/sentence/' + name + '.' + ext : null,
       letter:      () => {
         const upper = String(name).toUpperCase();
         return (M.letters && M.letters[upper] && M.letters[upper].audio)
@@ -126,7 +128,7 @@
       const url = tryCategory[hint]();
       if (url) return url;
     }
-    for (const cat of ['phoneme', 'word', 'rime', 'instruction', 'letter']) {
+    for (const cat of ['phoneme', 'word', 'rime', 'instruction', 'sentence', 'letter']) {
       if (cat === hint) continue;
       const url = tryCategory[cat]();
       if (url) return url;
@@ -134,12 +136,17 @@
     return null;
   }
 
-  // Word images live under /assets/images/word/<word>.<ext>
-  function resolveImageUrl(word, ext) {
+  function resolveImageUrl(name, ext) {
     const M = State.assetManifest;
     ext = ext || 'webp';
-    if (M.words && M.words[word] && M.words[word].image) {
-      return '/assets/images/word/' + word + '.' + ext;
+    if (M.words && M.words[name] && M.words[name].image) {
+      return '/assets/images/word/' + name + '.' + ext;
+    }
+    if (M.scenes && M.scenes[name]) {
+      return '/assets/images/scene/' + name + '.' + ext;
+    }
+    if (M.panels && M.panels[name]) {
+      return '/assets/images/panel/' + name + '.' + ext;
     }
     return null;
   }
@@ -454,7 +461,12 @@
     const topMap = Object.fromEntries(t.topItems.map((x) => [x.id, x.value]));
     const botMap = Object.fromEntries(t.bottomItems.map((x) => [x.id, x.value]));
     const matchType = t.matchType || 'picture_to_word';
-    const leftIsImage = matchType === 'picture_to_word';
+    // Every picture_to_* variant puts the picture on the left with word audio;
+    // the right column carries the text to match (word / rime label / letter).
+    // picture_to_rhyme and picture_to_letter used to fall through to the text
+    // branch, so their pictures rendered as bare words.
+    const PICTURE_LEFT = ['picture_to_word', 'picture_to_rhyme', 'picture_to_letter'];
+    const leftIsImage = PICTURE_LEFT.indexOf(matchType) !== -1;
     const pairs = t.correctPairs.map((pairStr) => {
       const [topId, botId] = String(pairStr).split('-');
       const leftValue = topMap[topId];
@@ -581,26 +593,31 @@
       throw new Error('sequence topic missing cards');
     }
     const cards = t.cards.slice().sort((a, b) => (a.cardOrder || 0) - (b.cardOrder || 0));
-    const isText = t.cardDisplay === 'sentence' || t.cardDisplay === 'text';
+    const isPicture = t.cardDisplay === 'picture';
+    const variant = isPicture ? 'v1' : 'v2';
     // Deterministic scrambled display: reverse order
     const displayOrder = cards.map((_, i) => cards.length - 1 - i + 1);
     return {
       kind: 'legacy',
       templateId: 'T-SEQUENCE',
-      variant: isText ? 'v2' : 'v1',
+      variant: variant,
       sourceTraces: null,
       data: {
         page_id: ctx.pageId,
         template_id: 'T-SEQUENCE',
-        variant: isText ? 'v2' : 'v1',
+        variant: variant,
         grade: ctx.grade,
         instruction_text: ctx.instructionText,
         instruction_audio: ctx.instructionAudio,
-        items: cards.map((c) => ({
-          content: c.cardKey,
-          type: isText ? 'text' : 'word',
-          order: c.cardOrder
-        })),
+        items: cards.map((c) => {
+          if (isPicture) {
+            const imgName = t.sceneName
+              ? t.sceneName + '_' + c.cardKey
+              : c.cardKey;
+            return { content: imgName + '.webp', type: 'image', order: c.cardOrder };
+          }
+          return { content: c.cardKey, type: 'text', order: c.cardOrder };
+        }),
         display_order: displayOrder
       }
     };
@@ -838,7 +855,10 @@
           text: r.passageText || '',
           image: Array.isArray(r.imageGroup) && r.imageGroup[0]
             ? r.imageGroup[0] + '.webp'
-            : null
+            : null,
+          images: Array.isArray(r.imageGroup) && r.imageGroup.length
+            ? r.imageGroup.map(function (name) { return name + '.webp'; })
+            : []
         },
         questions: (t.questions || []).map((q) => {
           const isChoice = q.answerMode === 'choice';
@@ -1075,11 +1095,14 @@
   }
 
   function translateDictation(topics, ctx) {
+    var items = topics.length === 1 && Array.isArray(topics[0].items)
+      ? topics[0].items
+      : topics;
     return {
       kind: 'legacy',
       templateId: 'T-DICTATION',
       variant: 'v1',
-      sourceTraces: topics.map(() => null),
+      sourceTraces: items.map(() => null),
       data: {
         page_id: ctx.pageId,
         template_id: 'T-DICTATION',
@@ -1087,9 +1110,9 @@
         grade: ctx.grade,
         instruction_text: ctx.instructionText,
         instruction_audio: ctx.instructionAudio,
-        items: topics.map((t) => ({
-          audio: (t.audio || t.audioKey || '') + '.mp3',
-          sentence: t.sentence || '',
+        items: items.map((t) => ({
+          audio: (t.audio || t.audioKey || t.audioName || '') + '.mp3',
+          sentence: t.sentence || t.answer || '',
           answer: t.answer || t.sentence || ''
         }))
       }
@@ -1162,9 +1185,16 @@
       const SUB = {
         letter_case:     { variantNumber: 1, variantName: 'Match Letter Case (4 Pairs)' },
         picture_to_word: { variantNumber: 2, variantName: 'Match Picture to Word (4 Pairs)' },
-        synonyms:        { variantNumber: 3, variantName: 'Match Synonyms (4 Pairs)' },
-        antonyms:        { variantNumber: 3, variantName: 'Match Antonyms (4 Pairs)' },
-        sound_to_word:   { variantNumber: 4, variantName: 'Match Sound to Word (4 Pairs)' }
+        // canonical matchType values are singular (spec ELA-Template-json.html + landed G2-4/G2-6 data);
+        // plural keys here previously made synonym/antonym pages show "(unknown matchType)"
+        synonym:         { variantNumber: 3, variantName: 'Match Synonyms (4 Pairs)' },
+        antonym:         { variantNumber: 3, variantName: 'Match Antonyms (4 Pairs)' },
+        sound_to_word:   { variantNumber: 4, variantName: 'Match Sound to Word (4 Pairs)' },
+        // Both shipped in PK books but were never registered here, so every one
+        // of those pages showed "(unknown matchType)". Numbers follow
+        // ELA_Template_40-DrawLine.md section order.
+        picture_to_rhyme:  { variantNumber: 5, variantName: 'Match Picture to Rhyme (4 Pairs)' },
+        picture_to_letter: { variantNumber: 6, variantName: 'Match Picture to Letter (4 Pairs)' }
       };
       const sub = SUB[m] || { variantNumber: null, variantName: '(unknown matchType: ' + m + ')' };
       return Object.assign({ templateId: 'T-MATCH' }, sub);
@@ -1571,7 +1601,7 @@
     container.querySelectorAll('.ws-audio-btn, .ws-phoneme-btn').forEach((btn) => {
       if (btn.dataset.audioSequence) return;  // sequence buttons handled by wireSequencePlayback
       const title = btn.getAttribute('title') || '';
-      const m = title.match(/Audio:\s*(?:(letter|rime|phoneme|word|instruction):)?([^.\s:]+)\.(mp3|wav|m4a)$/i);
+      const m = title.match(/Audio:\s*(?:(letter|rime|phoneme|word|instruction|sentence):)?([^.\s:]+)\.(mp3|wav|m4a)$/i);
       if (!m) return;
       const hint = m[1] || null;
       const name = m[2];
@@ -1593,7 +1623,7 @@
     container.querySelectorAll('.ws-audio-btn[data-audio-sequence]').forEach((btn) => {
       const tokens = parseSequence(btn.dataset.audioSequence);
       const urls = tokens.map((tok) => {
-        const m = tok.match(/^(?:(letter|rime|phoneme|word|instruction):)?([^.\s:]+)\.(mp3|wav|m4a)$/i);
+        const m = tok.match(/^(?:(letter|rime|phoneme|word|instruction|sentence):)?([^.\s:]+)\.(mp3|wav|m4a)$/i);
         if (!m) return null;
         return resolveAudioUrl(m[2], m[3].toLowerCase(), m[1] || null);
       }).filter(Boolean);
