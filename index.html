@@ -33,12 +33,16 @@
 
       <div id="bitable-controls" hidden>
         <div class="sidebar-header">Bitable Source</div>
+        <div id="bt-source-tabs">
+          <button type="button" class="bt-tab active" data-source="curriculum">Curriculum</button>
+          <button type="button" class="bt-tab" data-source="library">Library</button>
+        </div>
         <div class="bt-control-group">
-          <label class="bt-label" for="bt-workbook">Workbook</label>
+          <label class="bt-label" for="bt-workbook">Book</label>
           <select id="bt-workbook"><option>Loading...</option></select>
         </div>
         <div class="bt-control-group">
-          <label class="bt-label" for="bt-unit">Unit</label>
+          <label class="bt-label" id="bt-unit-label" for="bt-unit">Station</label>
           <select id="bt-unit"><option>Loading...</option></select>
         </div>
         <div id="bt-page-nav">
@@ -53,6 +57,7 @@
     <main id="main-area">
       <header id="bitable-page-header" hidden>
         <span class="bt-ph-meta">
+          <span id="bt-ph-source-badge" class="bt-source-badge" hidden></span>
           <strong id="bt-ph-unit">—</strong>
           <span id="bt-ph-subtitle-wrap" hidden> · <em id="bt-ph-subtitle"></em></span>
           · Page <span id="bt-ph-page">-</span>/<span id="bt-ph-total">-</span>

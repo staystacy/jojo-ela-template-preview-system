@@ -25,15 +25,47 @@ window.JOJO_RENDERERS['T-PASSAGE'] = function (data, container) {
   passageCol.className = 'ws-passage-col';
 
   if (data.passage) {
-    if (data.passage.title) {
-      var title = document.createElement('div');
-      title.className = 'ws-passage-title';
-      title.textContent = data.passage.title;
-      R.annotate(title, 'passage.title');
-      passageCol.appendChild(title);
+    // Passage header: title + optional full-text read-aloud speaker.
+    // This speaker is distinct from the instruction speaker above it — that one
+    // reads "Read the story. Answer the questions.", this one reads the passage.
+    // Pages without passageAudioName render exactly as before (no button).
+    if (data.passage.title || data.passage.audio) {
+      var head = document.createElement('div');
+      head.style.display = 'flex';
+      head.style.alignItems = 'center';
+      head.style.gap = '8px';
+      head.style.marginBottom = '8px';
+
+      if (data.passage.title) {
+        var title = document.createElement('div');
+        title.className = 'ws-passage-title';
+        title.style.marginBottom = '0';  // the header row owns the spacing now
+        title.textContent = data.passage.title;
+        R.annotate(title, 'passage.title');
+        head.appendChild(title);
+      }
+
+      if (data.passage.audio) {
+        var passageAudioBtn = R.audioButton(data.passage.audio);
+        R.annotate(passageAudioBtn, 'passage.audio');
+        head.appendChild(passageAudioBtn);
+      }
+
+      passageCol.appendChild(head);
     }
 
-    if (data.passage.image) {
+    if (data.passage.images && data.passage.images.length > 1) {
+      var imgStrip = document.createElement('div');
+      imgStrip.style.display = 'flex';
+      imgStrip.style.gap = '6px';
+      imgStrip.style.marginBottom = '10px';
+      data.passage.images.forEach(function (fname, i) {
+        var img = R.imagePlaceholder(fname, 100, 75);
+        R.annotate(img, 'passage.images[' + i + ']');
+        imgStrip.appendChild(img);
+      });
+      passageCol.appendChild(imgStrip);
+    } else if (data.passage.image) {
       var img = R.imagePlaceholder(data.passage.image, 200, 120);
       R.annotate(img, 'passage.image');
       passageCol.appendChild(img);

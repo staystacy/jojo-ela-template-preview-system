@@ -64,11 +64,18 @@ window.JOJO_RENDERERS['T-FILLIN'] = function (data, container) {
         }
         if (pi < parts.length - 1) {
           var blankLen = item.blank_length || 1;
+          // group answer cells so a multi-letter answer wraps as one unit
+          // (individual cells used to split across lines in the 2-column layout)
+          var cellGroup = document.createElement('span');
+          cellGroup.style.display = 'inline-flex';
+          cellGroup.style.gap = '4px';
+          cellGroup.style.flexWrap = 'nowrap';
           for (var b = 0; b < blankLen; b++) {
             var answer = item.answer || '';
             var ch = answer[b] || '';
-            displayWrap.appendChild(R.writingCell(cellSize, 'answer', ch));
+            cellGroup.appendChild(R.writingCell(cellSize, 'answer', ch));
           }
+          displayWrap.appendChild(cellGroup);
         }
       });
     }
