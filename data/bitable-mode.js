@@ -99,11 +99,14 @@
   }
 
   // Resolve an audio filename into a real URL.
-  // hint (optional) ∈ { 'letter' | 'rime' | 'phoneme' | 'word' | 'instruction' }
+  // hint (optional) ∈ { 'letter' | 'rime' | 'phoneme' | 'word' | 'instruction' | 'sentence' | 'passage' }
   //   When given, the named category is tried first so that same-token files
   //   in multiple categories (e.g. word/at.mp3 vs rime/at.mp3, word/a.mp3 vs
   //   letter/A.mp3) resolve to the semantically-correct one.
-  // Fallback order when no hint or hint miss: phoneme → word → rime → instruction → letter.
+  // Fallback order when no hint or hint miss: phoneme → word → rime → instruction → sentence → letter → passage.
+  // passage goes last: its keys are story slugs, which are the most likely to
+  // collide with a same-named word/sentence file, and T-PASSAGE always passes
+  // the explicit `passage:` hint anyway.
   function resolveAudioUrl(name, ext, hint) {
     const M = State.assetManifest;
     ext = ext || 'mp3';
@@ -118,6 +121,8 @@
                           ? '/assets/audio/instruction/' + name + '.' + ext : null,
       sentence:    () => (M.sentences && M.sentences[name] && M.sentences[name].audio)
                           ? '/assets/audio/sentence/' + name + '.' + ext : null,
+      passage:     () => (M.passages && M.passages[name] && M.passages[name].audio)
+                          ? '/assets/audio/passage/' + name + '.' + ext : null,
       letter:      () => {
         const upper = String(name).toUpperCase();
         return (M.letters && M.letters[upper] && M.letters[upper].audio)
@@ -128,7 +133,7 @@
       const url = tryCategory[hint]();
       if (url) return url;
     }
-    for (const cat of ['phoneme', 'word', 'rime', 'instruction', 'sentence', 'letter']) {
+    for (const cat of ['phoneme', 'word', 'rime', 'instruction', 'sentence', 'letter', 'passage']) {
       if (cat === hint) continue;
       const url = tryCategory[cat]();
       if (url) return url;
@@ -853,6 +858,10 @@
         passage: {
           title: r.title || '',
           text: r.passageText || '',
+          // Full-text read-aloud (optional). Pages authored before this field
+          // existed simply have no passageAudioName → no speaker button.
+          // The `passage:` prefix is the resolver hint (see resolveAudioUrl).
+          audio: t.passageAudioName ? 'passage:' + t.passageAudioName + '.mp3' : null,
           image: Array.isArray(r.imageGroup) && r.imageGroup[0]
             ? r.imageGroup[0] + '.webp'
             : null,
@@ -1601,7 +1610,7 @@
     container.querySelectorAll('.ws-audio-btn, .ws-phoneme-btn').forEach((btn) => {
       if (btn.dataset.audioSequence) return;  // sequence buttons handled by wireSequencePlayback
       const title = btn.getAttribute('title') || '';
-      const m = title.match(/Audio:\s*(?:(letter|rime|phoneme|word|instruction|sentence):)?([^.\s:]+)\.(mp3|wav|m4a)$/i);
+      const m = title.match(/Audio:\s*(?:(letter|rime|phoneme|word|instruction|sentence|passage):)?([^.\s:]+)\.(mp3|wav|m4a)$/i);
       if (!m) return;
       const hint = m[1] || null;
       const name = m[2];
@@ -1623,7 +1632,7 @@
     container.querySelectorAll('.ws-audio-btn[data-audio-sequence]').forEach((btn) => {
       const tokens = parseSequence(btn.dataset.audioSequence);
       const urls = tokens.map((tok) => {
-        const m = tok.match(/^(?:(letter|rime|phoneme|word|instruction|sentence):)?([^.\s:]+)\.(mp3|wav|m4a)$/i);
+        const m = tok.match(/^(?:(letter|rime|phoneme|word|instruction|sentence|passage):)?([^.\s:]+)\.(mp3|wav|m4a)$/i);
         if (!m) return null;
         return resolveAudioUrl(m[2], m[3].toLowerCase(), m[1] || null);
       }).filter(Boolean);

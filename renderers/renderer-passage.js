@@ -25,12 +25,33 @@ window.JOJO_RENDERERS['T-PASSAGE'] = function (data, container) {
   passageCol.className = 'ws-passage-col';
 
   if (data.passage) {
-    if (data.passage.title) {
-      var title = document.createElement('div');
-      title.className = 'ws-passage-title';
-      title.textContent = data.passage.title;
-      R.annotate(title, 'passage.title');
-      passageCol.appendChild(title);
+    // Passage header: title + optional full-text read-aloud speaker.
+    // This speaker is distinct from the instruction speaker above it — that one
+    // reads "Read the story. Answer the questions.", this one reads the passage.
+    // Pages without passageAudioName render exactly as before (no button).
+    if (data.passage.title || data.passage.audio) {
+      var head = document.createElement('div');
+      head.style.display = 'flex';
+      head.style.alignItems = 'center';
+      head.style.gap = '8px';
+      head.style.marginBottom = '8px';
+
+      if (data.passage.title) {
+        var title = document.createElement('div');
+        title.className = 'ws-passage-title';
+        title.style.marginBottom = '0';  // the header row owns the spacing now
+        title.textContent = data.passage.title;
+        R.annotate(title, 'passage.title');
+        head.appendChild(title);
+      }
+
+      if (data.passage.audio) {
+        var passageAudioBtn = R.audioButton(data.passage.audio);
+        R.annotate(passageAudioBtn, 'passage.audio');
+        head.appendChild(passageAudioBtn);
+      }
+
+      passageCol.appendChild(head);
     }
 
     if (data.passage.images && data.passage.images.length > 1) {

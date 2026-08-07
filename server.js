@@ -38,6 +38,7 @@ const COURSE_DIR = process.env.COURSE_DIR
 //   audio/rime/<rime>.mp3          — rime sound (-at, -an, …)
 //   audio/instruction/<id>.mp3     — instruction TTS (future)
 //   audio/phoneme/<x>.mp3          — phoneme sound (future)
+//   audio/passage/<slug>.mp3       — T-PASSAGE full-text read-aloud
 //   audio/sfx/<name>.mp3           — sound effects
 function scanDir(dir, extRegex) {
   try {
@@ -63,6 +64,7 @@ function scanAssetManifest() {
   const phonemeAudioNames     = scanDir(path.join(ASSETS_DIR, 'audio',  'phoneme'),      AUDIO_RE);
   const instructionAudioNames = scanDir(path.join(ASSETS_DIR, 'audio',  'instruction'),  AUDIO_RE);
   const sentenceAudioNames   = scanDir(path.join(ASSETS_DIR, 'audio',  'sentence'),     AUDIO_RE);
+  const passageAudioNames     = scanDir(path.join(ASSETS_DIR, 'audio',  'passage'),      AUDIO_RE);
 
   const words = {};
   function ensure(w) { if (!words[w]) words[w] = { image: false, audio: false }; return words[w]; }
@@ -87,6 +89,11 @@ function scanAssetManifest() {
   const sentences = {};
   sentenceAudioNames.forEach((s) => { sentences[s] = { audio: true }; });
 
+  // Passage audio — full-text read-aloud for T-PASSAGE, keyed by story slug
+  // (same slug as the panel imageGroup minus its _1.._4 suffix).
+  const passages = {};
+  passageAudioNames.forEach((p) => { passages[p] = { audio: true }; });
+
   const panels = {};
   panelImageNames.forEach((p) => { panels[p] = { image: true }; });
 
@@ -103,7 +110,8 @@ function scanAssetManifest() {
     rimes,
     phonemes,
     instructions,
-    sentences
+    sentences,
+    passages
   };
 }
 
