@@ -229,27 +229,21 @@ function scanCoursePages() {
     .filter((d) => d.isDirectory()).map((d) => d.name);
   for (const book of bookDirs) {
     const bookPath = path.join(COURSE_DIR, book);
-    const bankDirs = fs.readdirSync(bookPath, { withFileTypes: true })
+    const stationDirs = fs.readdirSync(bookPath, { withFileTypes: true })
       .filter((d) => d.isDirectory()).map((d) => d.name);
-    for (const bank of bankDirs) {
-      const bankPath = path.join(bookPath, bank);
-      const stationDirs = fs.readdirSync(bankPath, { withFileTypes: true })
-        .filter((d) => d.isDirectory()).map((d) => d.name);
-      for (const stationId of stationDirs) {
-        const stationPath = path.join(bankPath, stationId);
-        const pageFiles = fs.readdirSync(stationPath)
-          .filter((f) => /^P\d+\.json$/.test(f))
-          .sort();
-        if (pageFiles.length === 0) continue;
-        units.push({
-          unit_code: stationId,
-          workbook: book,
-          page_count: pageFiles.length,
-          files: pageFiles,
-          source: 'curriculum',
-          bank: bank
-        });
-      }
+    for (const stationId of stationDirs) {
+      const stationPath = path.join(bookPath, stationId);
+      const pageFiles = fs.readdirSync(stationPath)
+        .filter((f) => /^P\d+\.json$/.test(f))
+        .sort();
+      if (pageFiles.length === 0) continue;
+      units.push({
+        unit_code: stationId,
+        workbook: book,
+        page_count: pageFiles.length,
+        files: pageFiles,
+        source: 'curriculum'
+      });
     }
   }
   units.sort((a, b) => a.unit_code.localeCompare(b.unit_code));
@@ -284,7 +278,7 @@ function loadUnit(code) {
   if (!curMeta) return null;
   const pages = [];
   for (const f of curMeta.files) {
-    const fpath = path.join(COURSE_DIR, curMeta.workbook, curMeta.bank, curMeta.unit_code, f);
+    const fpath = path.join(COURSE_DIR, curMeta.workbook, curMeta.unit_code, f);
     try {
       pages.push(JSON.parse(fs.readFileSync(fpath, 'utf8')));
     } catch (e) {
@@ -296,7 +290,7 @@ function loadUnit(code) {
     workbook: curMeta.workbook,
     page_count: curMeta.page_count,
     pages,
-    source_files: curMeta.files.map((f) => '/data/course/' + curMeta.workbook + '/' + curMeta.bank + '/' + curMeta.unit_code + '/' + f),
+    source_files: curMeta.files.map((f) => '/data/course/' + curMeta.workbook + '/' + curMeta.unit_code + '/' + f),
     fetched_at: new Date().toISOString()
   };
 }
