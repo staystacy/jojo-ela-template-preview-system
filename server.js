@@ -28,6 +28,8 @@ const NAMING_CSV = process.env.NAMING_CSV
   || '/Users/stacywang/Desktop/JOJO-Worksheet-Research/Framework/assets/naming.csv';
 const COURSE_DIR = process.env.COURSE_DIR
   || '/Users/stacywang/Desktop/JOJO-Worksheet-Research/03b-Course-Page-JSON';
+const BOOKS_CSV  = process.env.BOOKS_CSV
+  || '/Users/stacywang/Desktop/JOJO-Worksheet-Research/04-Skills/shared/data/books.csv';
 
 // ---------- Boot: scan asset manifest ----------
 // New layout (May 2026): 10-Final-Assets/
@@ -153,8 +155,48 @@ function parseCsvLine(line) {
   return out;
 }
 
+// ---------- Boot: read segment (分冊) titles from books.csv ----------
+// Mirror of Bitable 分冊表, produced by 04-Skills/shared/pull_books.py.
+// Curriculum units carry their segment ID in `unit.workbook` (see
+// scanCoursePages), so these rows join the same ID -> name table as the
+// library workbooks — there is deliberately no second lookup path.
+function readBooksCsv() {
+  try {
+    const lines = fs.readFileSync(BOOKS_CSV, 'utf8').split(/\r?\n/).filter(Boolean);
+    if (lines.length < 2) return {};
+    // Header-driven: never index columns by position, so a reordered mirror
+    // cannot silently shift values.
+    const header = parseCsvLine(lines[0]).map((h) => h.trim());
+    const col = (name) => header.indexOf(name);
+    const iId = col('book_id');
+    const iTitle = col('title_en');
+    const iSubtitle = col('subtitle_en');
+    if (iId < 0 || iTitle < 0) {
+      console.warn('[server] books.csv missing book_id/title_en columns:', BOOKS_CSV);
+      return {};
+    }
+    const titles = {};
+    for (let i = 1; i < lines.length; i++) {
+      const cells = parseCsvLine(lines[i]);
+      const id = (cells[iId] || '').trim();
+      if (!id) continue;
+      titles[id] = {
+        title: (cells[iTitle] || '').trim(),
+        subtitle: (iSubtitle >= 0 ? (cells[iSubtitle] || '') : '').trim()
+      };
+    }
+    return titles;
+  } catch (e) {
+    console.warn('[server] books.csv not readable:', BOOKS_CSV, e.message);
+    return {};
+  }
+}
+
 const workbookTitles = readNamingCsv();
 console.log(`[server] naming.csv: ${Object.keys(workbookTitles).length} workbook titles loaded`);
+const bookTitles = readBooksCsv();
+Object.assign(workbookTitles, bookTitles);
+console.log(`[server] books.csv: ${Object.keys(bookTitles).length} segment titles loaded`);
 
 // Per-request manifest with 5s TTL — lets users add files without restarting server.
 const manifestCache = { ts: 0, data: null };
