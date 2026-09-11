@@ -179,6 +179,38 @@ window.JOJO_RENDER = (function () {
     return svg;
   }
 
+  // ========== SVG Overlay, redrawn on relayout ==========
+  // Overlay paths are absolute SVG user units measured from the host's box, so
+  // a one-shot measurement goes stale on ANY later reflow: window or panel
+  // resize, a late image or webfont load, a scrollbar appearing. The <svg> is
+  // width:100% so it stretches, but its path coordinates do not — which is how
+  // a circle ends up beside the card instead of around it, and how match lines
+  // drift off their cards. Redraw whenever the host actually changes size.
+  //
+  // `draw(svg, hostRect)` must only append children; the overlay is absolutely
+  // positioned, so appending to it cannot resize the host and cannot loop.
+  function svgOverlayIn(host, draw) {
+    var svg = svgOverlay();
+    host.appendChild(svg);
+    var ro = null;
+
+    function redraw() {
+      if (!host.isConnected) {
+        if (ro) ro.disconnect();
+        return;
+      }
+      while (svg.firstChild) svg.removeChild(svg.firstChild);
+      draw(svg, host.getBoundingClientRect());
+    }
+
+    if (typeof ResizeObserver === 'function') {
+      ro = new ResizeObserver(redraw);
+      ro.observe(host);            // fires once on observe → initial draw
+    }
+    requestAnimationFrame(redraw); // covers the no-ResizeObserver case
+    return svg;
+  }
+
   // ========== Arrow ==========
   function arrow() {
     var el = document.createElement('span');
@@ -325,6 +357,7 @@ window.JOJO_RENDER = (function () {
     createSvgCircle: createSvgCircle,
     createSvgLine: createSvgLine,
     svgOverlay: svgOverlay,
+    svgOverlayIn: svgOverlayIn,
     arrow: arrow,
     phonemeButton: phonemeButton,
     itemRow: itemRow,

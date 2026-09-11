@@ -75,10 +75,7 @@ window.JOJO_RENDERERS['T-LISTEN'] = function (data, container) {
 
       // Draw circle on correct after layout
       (function (itemIdx, optionsEl, optsList) {
-        requestAnimationFrame(function () {
-          var svg = R.svgOverlay();
-          optionsEl.appendChild(svg);
-          var pRect = optionsEl.getBoundingClientRect();
+        R.svgOverlayIn(optionsEl, function (svg, pRect) {
           optsList.forEach(function (opt, oi) {
             if (!opt.correct) return;
             var el = document.getElementById('listen-' + itemIdx + '-opt-' + oi);
