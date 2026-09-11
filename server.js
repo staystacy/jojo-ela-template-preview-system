@@ -192,11 +192,27 @@ function readBooksCsv() {
   }
 }
 
-const workbookTitles = readNamingCsv();
-console.log(`[server] naming.csv: ${Object.keys(workbookTitles).length} workbook titles loaded`);
-const bookTitles = readBooksCsv();
-Object.assign(workbookTitles, bookTitles);
-console.log(`[server] books.csv: ${Object.keys(bookTitles).length} segment titles loaded`);
+// Per-request title table with 5s TTL, same reason as the asset manifest below:
+// a boot-time snapshot goes stale after `pull_books.py`, and a server started
+// before a code update would keep serving no segment titles to an already
+// updated app.js. Library workbooks and curriculum segments share one table —
+// scanCoursePages puts the segment ID in `unit.workbook`.
+const titlesCache = { ts: 0, data: null };
+function getBookTitles() {
+  if (titlesCache.data && Date.now() - titlesCache.ts < 5000) return titlesCache.data;
+  titlesCache.data = Object.assign(readNamingCsv(), readBooksCsv());
+  titlesCache.ts = Date.now();
+  return titlesCache.data;
+}
+
+// Boot log (also primes the cache).
+{
+  const namingCount = Object.keys(readNamingCsv()).length;
+  const bookCount = Object.keys(readBooksCsv()).length;
+  console.log(`[server] naming.csv: ${namingCount} workbook titles loaded`);
+  console.log(`[server] books.csv: ${bookCount} segment titles loaded`);
+  console.log(`[server] title table: ${Object.keys(getBookTitles()).length} entries`);
+}
 
 // Per-request manifest with 5s TTL — lets users add files without restarting server.
 const manifestCache = { ts: 0, data: null };
@@ -397,7 +413,7 @@ app.get('/api/units', (req, res) => {
     res.json({
       workbooks,
       courses,
-      workbook_titles: workbookTitles,
+      workbook_titles: getBookTitles(),
       units: filtered.map((r) => ({
         unit_code: r.unit_code,
         workbook: r.workbook,
