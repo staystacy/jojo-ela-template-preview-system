@@ -28,6 +28,8 @@ const NAMING_CSV = process.env.NAMING_CSV
   || '/Users/stacywang/Desktop/JOJO-Worksheet-Research/Framework/assets/naming.csv';
 const COURSE_DIR = process.env.COURSE_DIR
   || '/Users/stacywang/Desktop/JOJO-Worksheet-Research/03b-Course-Page-JSON';
+const BOOKS_CSV  = process.env.BOOKS_CSV
+  || '/Users/stacywang/Desktop/JOJO-Worksheet-Research/04-Skills/shared/data/books.csv';
 
 // ---------- Boot: scan asset manifest ----------
 // New layout (May 2026): 10-Final-Assets/
@@ -153,8 +155,48 @@ function parseCsvLine(line) {
   return out;
 }
 
+// ---------- Boot: read segment (分冊) titles from books.csv ----------
+// Mirror of Bitable 分冊表, produced by 04-Skills/shared/pull_books.py.
+// Curriculum units carry their segment ID in `unit.workbook` (see
+// scanCoursePages), so these rows join the same ID -> name table as the
+// library workbooks — there is deliberately no second lookup path.
+function readBooksCsv() {
+  try {
+    const lines = fs.readFileSync(BOOKS_CSV, 'utf8').split(/\r?\n/).filter(Boolean);
+    if (lines.length < 2) return {};
+    // Header-driven: never index columns by position, so a reordered mirror
+    // cannot silently shift values.
+    const header = parseCsvLine(lines[0]).map((h) => h.trim());
+    const col = (name) => header.indexOf(name);
+    const iId = col('book_id');
+    const iTitle = col('title_en');
+    const iSubtitle = col('subtitle_en');
+    if (iId < 0 || iTitle < 0) {
+      console.warn('[server] books.csv missing book_id/title_en columns:', BOOKS_CSV);
+      return {};
+    }
+    const titles = {};
+    for (let i = 1; i < lines.length; i++) {
+      const cells = parseCsvLine(lines[i]);
+      const id = (cells[iId] || '').trim();
+      if (!id) continue;
+      titles[id] = {
+        title: (cells[iTitle] || '').trim(),
+        subtitle: (iSubtitle >= 0 ? (cells[iSubtitle] || '') : '').trim()
+      };
+    }
+    return titles;
+  } catch (e) {
+    console.warn('[server] books.csv not readable:', BOOKS_CSV, e.message);
+    return {};
+  }
+}
+
 const workbookTitles = readNamingCsv();
 console.log(`[server] naming.csv: ${Object.keys(workbookTitles).length} workbook titles loaded`);
+const bookTitles = readBooksCsv();
+Object.assign(workbookTitles, bookTitles);
+console.log(`[server] books.csv: ${Object.keys(bookTitles).length} segment titles loaded`);
 
 // Per-request manifest with 5s TTL — lets users add files without restarting server.
 const manifestCache = { ts: 0, data: null };
@@ -229,27 +271,21 @@ function scanCoursePages() {
     .filter((d) => d.isDirectory()).map((d) => d.name);
   for (const book of bookDirs) {
     const bookPath = path.join(COURSE_DIR, book);
-    const bankDirs = fs.readdirSync(bookPath, { withFileTypes: true })
+    const stationDirs = fs.readdirSync(bookPath, { withFileTypes: true })
       .filter((d) => d.isDirectory()).map((d) => d.name);
-    for (const bank of bankDirs) {
-      const bankPath = path.join(bookPath, bank);
-      const stationDirs = fs.readdirSync(bankPath, { withFileTypes: true })
-        .filter((d) => d.isDirectory()).map((d) => d.name);
-      for (const stationId of stationDirs) {
-        const stationPath = path.join(bankPath, stationId);
-        const pageFiles = fs.readdirSync(stationPath)
-          .filter((f) => /^P\d+\.json$/.test(f))
-          .sort();
-        if (pageFiles.length === 0) continue;
-        units.push({
-          unit_code: stationId,
-          workbook: book,
-          page_count: pageFiles.length,
-          files: pageFiles,
-          source: 'curriculum',
-          bank: bank
-        });
-      }
+    for (const stationId of stationDirs) {
+      const stationPath = path.join(bookPath, stationId);
+      const pageFiles = fs.readdirSync(stationPath)
+        .filter((f) => /^P\d+\.json$/.test(f))
+        .sort();
+      if (pageFiles.length === 0) continue;
+      units.push({
+        unit_code: stationId,
+        workbook: book,
+        page_count: pageFiles.length,
+        files: pageFiles,
+        source: 'curriculum'
+      });
     }
   }
   units.sort((a, b) => a.unit_code.localeCompare(b.unit_code));
@@ -284,7 +320,7 @@ function loadUnit(code) {
   if (!curMeta) return null;
   const pages = [];
   for (const f of curMeta.files) {
-    const fpath = path.join(COURSE_DIR, curMeta.workbook, curMeta.bank, curMeta.unit_code, f);
+    const fpath = path.join(COURSE_DIR, curMeta.workbook, curMeta.unit_code, f);
     try {
       pages.push(JSON.parse(fs.readFileSync(fpath, 'utf8')));
     } catch (e) {
@@ -296,7 +332,7 @@ function loadUnit(code) {
     workbook: curMeta.workbook,
     page_count: curMeta.page_count,
     pages,
-    source_files: curMeta.files.map((f) => '/data/course/' + curMeta.workbook + '/' + curMeta.bank + '/' + curMeta.unit_code + '/' + f),
+    source_files: curMeta.files.map((f) => '/data/course/' + curMeta.workbook + '/' + curMeta.unit_code + '/' + f),
     fetched_at: new Date().toISOString()
   };
 }

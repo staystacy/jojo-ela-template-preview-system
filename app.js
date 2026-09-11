@@ -223,15 +223,6 @@
   var btPhFilename = document.getElementById('bt-ph-filename');
   var demoSidebarBlock = document.getElementById('demo-sidebar-block');
   var jsonModeToggleEl = document.getElementById('json-mode-toggle');
-  var COURSE_TITLES = {
-    'B1': 'Phonics Inflections',
-    'B2': 'Grammar Foundations',
-    'B3': 'Reading Fluency',
-    'C1': 'Advanced Phonics',
-    'C2': 'Comprehension',
-    'D1': 'Writing Skills',
-    'D2': 'Language Arts Review'
-  };
   var assetManifestLoaded = false;
 
   // ========== Init ==========
@@ -279,13 +270,12 @@
     books.forEach(function (bk) {
       var opt = document.createElement('option');
       opt.value = bk;
-      if (source === 'curriculum') {
-        var ct = COURSE_TITLES[bk];
-        opt.textContent = ct ? (bk + ' — ' + ct) : bk;
-      } else {
-        var meta = state.bitable.workbookTitles[bk];
-        opt.textContent = meta && meta.title ? (bk + ' — ' + meta.title) : bk;
-      }
+      // One ID -> name table for both sources: workbook titles come from
+      // naming.csv, segment titles from books.csv, merged server-side. Do not
+      // reintroduce a hardcoded title map — it silently blanks out every
+      // segment nobody remembered to add.
+      var meta = state.bitable.workbookTitles[bk];
+      opt.textContent = meta && meta.title ? (bk + ' — ' + meta.title) : bk;
       btWorkbookSel.appendChild(opt);
     });
   }
