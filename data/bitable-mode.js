@@ -472,19 +472,40 @@
     // branch, so their pictures rendered as bare words.
     const PICTURE_LEFT = ['picture_to_word', 'picture_to_rhyme', 'picture_to_letter'];
     const leftIsImage = PICTURE_LEFT.indexOf(matchType) !== -1;
-    const pairs = t.correctPairs.map((pairStr) => {
-      const [topId, botId] = String(pairStr).split('-');
-      const leftValue = topMap[topId];
-      const rightValue = botMap[botId];
+    // The preview must show the page the way the Page JSON lays it out: left
+    // column in topItems order, right column in bottomItems order. Building
+    // pairs from correctPairs instead made the left column follow the pair
+    // list, so the rendered column order was whatever order the pairs happened
+    // to be written in.
+    const bottomIdForTop = new Map(
+      t.correctPairs.map((pairStr) => String(pairStr).split('-'))
+    );
+    const pairs = t.topItems.map((top) => {
+      const leftValue = top.value;
+      const rightValue = botMap[bottomIdForTop.get(top.id)];
       const left = leftIsImage
         ? { content: leftValue + '.webp', type: 'image', audio: leftValue + '.mp3' }
         : { content: leftValue, type: 'word', audio: leftValue + '.mp3' };
       return { left, right: { content: rightValue, type: 'word' } };
     });
+    // Where each pair's right-hand card sits, straight from bottomItems. Null
+    // when the pairing is not a clean bijection -- the renderer then falls back
+    // rather than dropping or duplicating a card.
+    const pairIndexByBottomId = new Map();
+    t.topItems.forEach((top, index) => {
+      pairIndexByBottomId.set(bottomIdForTop.get(top.id), index);
+    });
+    const rightOrder = t.bottomItems.map((b) => pairIndexByBottomId.get(b.id));
+    const rightOrderIsComplete =
+      rightOrder.length === pairs.length
+      && rightOrder.every((index) => Number.isInteger(index))
+      && new Set(rightOrder).size === pairs.length;
     return {
       kind: 'legacy',
       templateId: 'T-MATCH',
       variant: 'v2',
+      // pairs now follow topItems, so this index is the topItems index it has
+      // always claimed to be.
       sourceTraces: pairs.map((p, i) => {
         const stm = t.source_trace_map || {};
         return stm['topItems[' + i + '].value'] || null;
@@ -496,7 +517,8 @@
         grade: ctx.grade,
         instruction_text: ctx.instructionText,
         instruction_audio: ctx.instructionAudio,
-        pairs
+        pairs,
+        right_order: rightOrderIsComplete ? rightOrder : null
       }
     };
   }
