@@ -46,17 +46,28 @@ window.JOJO_RENDERERS['T-FIXUP'] = function (data, container) {
     var words = item.incorrect_sentence.split(/(\s+)/);
     var errors = item.errors || [];
     var errorMap = {};
+    var errorByIndex = {};
     errors.forEach(function (err) {
-      errorMap[err.incorrect.toLowerCase()] = err;
+      if (Number.isInteger(err.word_index) && err.word_index >= 0) {
+        errorByIndex[err.word_index] = err;
+      } else {
+        errorMap[err.incorrect.toLowerCase()] = err;
+      }
     });
 
+    var wordIndex = 0;
     words.forEach(function (word) {
       var clean = word.replace(/[.,!?;:]/g, '').toLowerCase();
-      if (errorMap[clean]) {
+      var err = null;
+      if (/\S/.test(word)) {
+        err = errorByIndex[wordIndex] || errorMap[clean] || null;
+        wordIndex += 1;
+      }
+      if (err) {
         var errSpan = document.createElement('span');
         errSpan.className = 'ws-error-word';
         errSpan.textContent = word;
-        errSpan.title = errorMap[clean].type + ': should be "' + errorMap[clean].correct + '"';
+        errSpan.title = err.type + ': should be "' + err.correct + '"';
         errSpan.style.position = 'relative';
         errSpan.style.display = 'inline-block';
         sentence.appendChild(errSpan);
@@ -70,10 +81,7 @@ window.JOJO_RENDERERS['T-FIXUP'] = function (data, container) {
 
     // Draw hand-drawn circles on error words
     (function (idx, wrap) {
-      requestAnimationFrame(function () {
-        var svg = R.svgOverlay();
-        wrap.appendChild(svg);
-        var wrapRect = wrap.getBoundingClientRect();
+      R.svgOverlayIn(wrap, function (svg, wrapRect) {
         var errorEls = wrap.querySelectorAll('.ws-error-word');
         errorEls.forEach(function (el, ei) {
           var r = el.getBoundingClientRect();

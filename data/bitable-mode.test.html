@@ -19,7 +19,12 @@
   <div class="stats" id="stats">Running...</div>
   <ul id="results"></ul>
 
+  <script>window.JOJO_RENDERERS = window.JOJO_RENDERERS || {};</script>
   <script src="../renderers/renderer-base.js"></script>
+  <script src="../renderers/renderer-circle.js"></script>
+  <script src="../renderers/renderer-findword.js"></script>
+  <script src="../renderers/renderer-sort.js"></script>
+  <script src="../renderers/renderer-ladder.js"></script>
   <script src="bitable-mode.js"></script>
   <script>
   /* eslint-disable */
@@ -347,17 +352,18 @@
     eq(r.ctx.instructionText, 'Listen to the word. Circle the picture.', 'instructionText');
   });
 
-  runner.check('Page 4 — matching → T-MATCH v2 (image left, word right)', () => {
+  runner.check('Page 4 — matching → T-MATCH v2 (playable top word + silent bottom picture)', () => {
     const r = T(PAGES.p4, {}, 'K-1_U01', 'K');
     eq(r.kind, 'legacy', 'kind');
     eq(r.templateId, 'T-MATCH', 'templateId');
     eq(r.variant, 'v2', 'variant');
+    eq(r.data.match_type, 'picture_to_word', 'match_type discriminator');
     eq(r.data.pairs.length, 4, 'pairs.length');
-    eq(r.data.pairs[0].left,  { content:'dad.webp', type:'image', audio:'dad.mp3' }, 'pair[0].left');
-    eq(r.data.pairs[0].right, { content:'dad', type:'word' }, 'pair[0].right');
-    eq(r.data.pairs[1].left.content, 'cat.webp', 'pair[1].left.content');
-    eq(r.data.pairs[2].left.content, 'hat.webp', 'pair[2].left.content');
-    eq(r.data.pairs[3].left.content, 'bat.webp', 'pair[3].left.content');
+    eq(r.data.pairs[0].left,  { content:'dad', type:'word', audio:'dad.mp3' }, 'pair[0].left');
+    eq(r.data.pairs[0].right, { content:'dad.webp', type:'image' }, 'pair[0].right');
+    eq(r.data.pairs[1].left.content, 'cat', 'pair[1].left.content');
+    eq(r.data.pairs[2].left.content, 'hat', 'pair[2].left.content');
+    eq(r.data.pairs[3].left.content, 'bat', 'pair[3].left.content');
     eq(r.sourceTraces[0], 'content_pool.decodable_words[12]', 'sourceTraces[0] (dad)');
   });
 
@@ -447,6 +453,77 @@
     eq(r.templateMeta, { templateId: 'T-CIRCLE', variantNumber: 1, variantName: 'Circle Picture by Sound (3 Cards, Single Choice)' }, 'templateMeta');
   });
 
+  runner.check('targetRime → T-CIRCLE › Circle Picture by Rhyme (4 Cards, Single-Select)', () => {
+    const r = T({
+      pageId: 51159,
+      instructionText: 'Circle the picture in the -ake family.',
+      englishLetterTopicList: [{
+        topicType: 'english_circle_picture',
+        targetRime: '-ake',
+        options: ['hound', 'flake', 'crown', 'point'],
+        correctWords: ['flake']
+      }]
+    }, {}, 'A5-M02S04', 'K');
+    eq(r.templateMeta, { templateId: 'T-CIRCLE', variantNumber: 5, variantName: 'Circle Picture by Rhyme (4 Cards, Single-Select)' }, 'templateMeta');
+    eq(r.data.target_rime_audio, 'rime:ake.mp3', 'target rime audio');
+
+    const host = document.createElement('div');
+    window.JOJO_RENDERERS['T-CIRCLE'](r.data, host);
+    const target = host.querySelector('.ws-circle-target-audio');
+    assert(target, 'target speaker exists');
+    eq(target.getAttribute('data-field'), 'target_rime_audio', 'target annotation');
+    eq(target.textContent, 'Target rime: -ake', 'target speaker labels the criterion without revealing the answer');
+    eq(target.querySelector('button').title, 'Audio: rime:ake.mp3', 'target audio title');
+    assert(target.previousElementSibling.classList.contains('ws-instruction'),
+      'target speaker is immediately below instruction');
+    assert(target.nextElementSibling.classList.contains('ws-layout-b'),
+      'target speaker is above options');
+  });
+
+  runner.check('target Rime Audio never falls back to same-key Word Audio', () => {
+    const savedManifest = window.JOJO_BITABLE._state.assetManifest;
+    try {
+      window.JOJO_BITABLE._state.assetManifest = {
+        words: {
+          ell: { audio: true },
+          ick: { audio: true }
+        },
+        rimes: {
+          ell: { audio: true }
+        }
+      };
+
+      const makePage = (targetRime, correctWord) => T({
+        pageId: targetRime === '-ell' ? 41177 : 41180,
+        instructionText: 'Circle the picture in the ' + targetRime + ' family.',
+        englishLetterTopicList: [{
+          topicType: 'english_circle_picture',
+          targetRime,
+          options: [correctWord, 'bed', 'bug', 'bun'],
+          correctWords: [correctWord]
+        }]
+      }, {}, 'A4-M02S01', 'K');
+
+      const ellHost = document.createElement('div');
+      window.JOJO_BITABLE.renderPage(makePage('-ell', 'bell'), ellHost);
+      const ellButton = ellHost.querySelector('.ws-circle-target-audio button');
+      eq(ellButton.disabled, false, 'existing ell Rime Audio remains playable');
+      eq(ellButton.dataset.audioSrc, '/assets/audio/rime/ell.mp3',
+        'ell resolves only through the Rime Audio category');
+
+      const ickHost = document.createElement('div');
+      window.JOJO_BITABLE.renderPage(makePage('-ick', 'kick'), ickHost);
+      const ickButton = ickHost.querySelector('.ws-circle-target-audio button');
+      eq(ickButton.disabled, true, 'missing ick Rime Audio is disabled');
+      eq(ickButton.dataset.audioSrc, undefined,
+        'missing ick does not borrow same-key Word Audio');
+      assert(ickButton.title.includes('Missing audio: ick.mp3'),
+        'missing requirement remains visible');
+    } finally {
+      window.JOJO_BITABLE._state.assetManifest = savedManifest;
+    }
+  });
+
   runner.check('Page 4 templateMeta picture_to_word → T-MATCH › Match Picture to Word (4 Pairs)', () => {
     const r = T(PAGES.p4, {}, 'K-1_U01', 'K');
     eq(r.templateMeta, { templateId: 'T-MATCH', variantNumber: 2, variantName: 'Match Picture to Word (4 Pairs)' }, 'templateMeta');
@@ -478,6 +555,7 @@
     eq(r.data.pairs[0].left.content, 'D',  'left.content stays as letter');
     eq(r.data.pairs[0].right.type, 'word', 'right.type');
     eq(r.data.pairs[0].right.content, 'd', 'right.content');
+    eq(r.data.pairs[0].right.audio, 'letter:d.mp3', 'letter_case right side uses Letter Audio');
     eq(r.templateMeta.variantName, 'Match Letter Case (4 Pairs)', 'variant');
   });
 
@@ -541,7 +619,7 @@
     eq(r.templateId, 'T-BLEND', 'templateId');
     eq(r.variant, 'v1', 'variant');
     eq(r.data.items.length, 2, 'items.length');
-    eq(r.data.items[0].phoneme_labels, ['/c/', '/at/'], 'items[0].phoneme_labels');
+    eq(r.data.items[0].phoneme_labels, ['c', 'at'], 'items[0].phoneme_labels');
     eq(r.data.items[0].phoneme_audios, ['phoneme:c.mp3', 'rime:at.mp3'], 'items[0].phoneme_audios (prefixed)');
     eq(r.data.items[0].image, 'cat.webp', 'items[0].image');
     eq(r.data.items[0].answer, 'cat', 'items[0].answer');
@@ -606,6 +684,15 @@
     eq(r.templateMeta.templateId, 'T-FINDWORD', 'templateId');
   });
 
+  runner.check('find_word renderer pre-highlights only the row 0 example', () => {
+    const r = T(PAGES.findWord, {}, 'K-1a_U05', 'K');
+    const host = document.createElement('div');
+    window.JOJO_RENDERERS['T-FINDWORD'](r.data, host);
+    const exampleCells = [...host.querySelectorAll('.ws-findword-example')];
+    eq(exampleCells.map((cell) => cell.textContent).join(''), 'cat', 'example cells');
+    eq(exampleCells.length, 3, 'one three-letter example is highlighted');
+  });
+
   runner.check('Unknown matchType → T-MATCH › (unknown matchType: foo)', () => {
     const page = {
       pageNumber: 99, instructionText: 'matching',
@@ -649,8 +736,28 @@
     };
     const r = T(page, {}, 'K-1a_U01', 'K');
     eq(r.data.items[0].phoneme_audios, ['phoneme:onset_k.mp3', 'rime:at.mp3'], 'row 0 uses *_id audio filenames (prefixed)');
-    eq(r.data.items[0].phoneme_labels, ['/c/', '/at/'], 'row 0 keeps grapheme labels');
+    eq(r.data.items[0].phoneme_labels, ['c', 'at'], 'row 0 keeps orthographic chunk labels');
     eq(r.data.items[1].phoneme_audios, ['phoneme:onset_h.mp3', 'rime:at.mp3'], 'row 1');
+  });
+
+  runner.check('onset_rime_blend renders required word images', () => {
+    const page = {
+      pageNumber: 71,
+      instructionText: 'Listen to the two parts. Write the whole word.',
+      instructionKey: 'listen_to_the_two_parts_write_the_whole_word',
+      englishLetterTopicList: [{
+        topicType: 'english_onset_rime_blend',
+        rows: [
+          { word:'fluff', imageName:'fluff', onset:'fl', rime:'uff', onset_phoneme_id:'onset_fl', rime_id:'uff', answer:'fluff' },
+          { word:'glass', imageName:'glass', onset:'gl', rime:'ass', onset_phoneme_id:'onset_gl', rime_id:'ass', answer:'glass' }
+        ]
+      }]
+    };
+    const r = T(page, {}, 'A4-M01S04', 'K');
+    eq(r.data.items[0].image, 'fluff.webp', 'row 0 image');
+    eq(r.data.items[1].image, 'glass.webp', 'row 1 image');
+    eq(r.data.items[0].phoneme_audios, ['phoneme:onset_fl.mp3', 'rime:uff.mp3'], 'row 0 audio ids');
+    eq(r.data.items[1].phoneme_audios, ['phoneme:onset_gl.mp3', 'rime:ass.mp3'], 'row 1 audio ids');
   });
 
   runner.check('phoneme_blend_picture uses phoneme_ids when present', () => {
@@ -774,6 +881,25 @@
        'templateMeta');
   });
 
+  runner.check('english_fixup preserves the exact repeated-word index', () => {
+    const page = {
+      pageNumber: 1,
+      instructionText: 'Cross out the mistakes. Then write the correct sentence.',
+      englishLetterTopicList: [{
+        topicType: 'english_fixup',
+        items: [{
+          incorrectSentence: 'the bird sing a song in the tree',
+          correctSentence: 'The bird sings a song in the tree.',
+          errorWords: ['the', 'sing', 'tree']
+        }]
+      }]
+    };
+    const r = T(page, {}, 'C1-M02S01', 'C1');
+    eq(r.data.items[0].errors.map((error) => error.word_index),
+      [0, 2, 7],
+      'only the intended first the is selected');
+  });
+
   // ============ Edge cases (T-SPELL sequential + T-TRANSFORM picture + audio prefix) ============
 
   runner.check('initial_sound_spelling → prompt_audio_sequence plays letter then word', () => {
@@ -799,11 +925,54 @@
     eq(r.data.items[0].original, 'hat', 'item[0].original (source word)');
     eq(r.data.items[0].answer, 'hate', 'item[0].answer (new word)');
     eq(r.data.items[0].image, 'hat.webp', 'item[0].image');
+    eq(r.data.items[0].rule, 'add_silent_e', 'picture transform keeps its silent-e rule');
     eq(r.data.items[0].audio, 'hat.mp3', 'item[0].audio (source word)');
     eq(r.data.items[0].target_audio, 'hate.mp3', 'item[0].target_audio (new word)');
     // cap → cape
     eq(r.data.items[3].audio, 'cap.mp3', 'item[3].audio');
     eq(r.data.items[3].target_audio, 'cape.mp3', 'item[3].target_audio');
+  });
+
+  runner.check('english_transform (displayType=text) omits unsupported rule labels', () => {
+    const page = {
+      pageNumber: 1,
+      instructionText: 'Add -ed. Write the past tense.',
+      englishLetterTopicList: [{
+        topicType: 'english_transform',
+        displayType: 'text',
+        items: [
+          { sourceWord: 'hop', answer: 'hopped' },
+          { sourceWord: 'cry', answer: 'cried' },
+          { sourceWord: 'walk', answer: 'walked' },
+          { sourceWord: 'kick', answer: 'kicked' }
+        ]
+      }]
+    };
+    const r = T(page, {}, 'C1-M03S01', 'C1');
+    eq(r.variant, 'v2', 'variant (text mode)');
+    eq(r.data.items.map((item) => item.rule),
+      [null, null, null, null],
+      'text transforms do not claim the silent-e rule');
+  });
+
+  runner.check('english_transform (displayType=text) preserves explicit suffix hints', () => {
+    const page = {
+      pageNumber: 1,
+      instructionText: 'Add -er or -est. Write the new word.',
+      englishLetterTopicList: [{
+        topicType: 'english_transform',
+        displayType: 'text',
+        items: [
+          { sourceWord: 'tall', hint: '-est', answer: 'tallest' },
+          { sourceWord: 'fast', hint: '-er', answer: 'faster' }
+        ]
+      }]
+    };
+    const r = T(page, {}, 'C2-M06S03', 'C2');
+    eq(r.variant, 'v2', 'variant (text mode)');
+    eq(r.data.items.map((item) => item.rule),
+      ['-est', '-er'],
+      'text transforms pass explicit suffix hints to the renderer');
   });
 
   runner.check('onset_rime_blend → phoneme/rime prefix routes resolver to right category', () => {
@@ -818,6 +987,581 @@
     eq(r.data.items[1].phoneme_audios,
        ['phoneme:h.mp3', 'rime:at.mp3'],
        'item[1] phoneme_audios prefixed');
+  });
+
+  runner.check('english_sequence sentence cards → Story Event Sequencing metadata', () => {
+    const page = {
+      pageNumber: 1,
+      englishLetterTopicList: [{
+        topicType: 'english_sequence',
+        cardDisplay: 'sentence',
+        cards: [
+          { cardKey: 'First.', cardOrder: 1 },
+          { cardKey: 'Second.', cardOrder: 2 },
+          { cardKey: 'Third.', cardOrder: 3 },
+          { cardKey: 'Fourth.', cardOrder: 4 }
+        ]
+      }]
+    };
+    const r = T(page, {}, 'B2-M03S01', 'B2');
+    eq(r.templateMeta.variantName,
+      'Story Event Sequencing (4 Cards, 4 Slots)',
+      'sentence discriminator selects the event-sequencing metadata');
+  });
+
+  runner.check('english_circle_sentence → 5-card contract metadata', () => {
+    const page = {
+      pageNumber: 1,
+      englishLetterTopicList: [{
+        topicType: 'english_circle_sentence',
+        mainIdea: 'Something that will happen later.',
+        sentences: [
+          'Mom will clap.',
+          'The kid will nap.',
+          'The dog will play.',
+          'The fox jumped.',
+          'The cat walks now.'
+        ],
+        correctIndexes: [0, 1, 3]
+      }]
+    };
+    const r = T(page, {}, 'B2-M03S01', 'B2');
+    eq(r.data.criterion,
+      'Something that will happen later.',
+      'mainIdea is preserved as the visible circle criterion');
+    eq(r.data.options.map((option) => option.audio).join('|'),
+      'sentence:mom_will_clap.mp3|sentence:the_kid_will_nap.mp3|sentence:the_dog_will_play.mp3|sentence:the_fox_jumped.mp3|sentence:the_cat_walks_now.mp3',
+      'each sentence card uses the Resource Builder sentence-audio slug');
+    eq(r.templateMeta.variantName,
+      'Circle Sentences by Main Idea (5 Cards, Multi-Select)',
+      'metadata follows the five-card live contract');
+  });
+
+  runner.check('english_sort_words pictureWord → v1 image cards and picture metadata', () => {
+    const page = {
+      pageNumber: 1,
+      englishLetterTopicList: [{
+        topicType: 'english_sort_words',
+        cardDisplay: 'pictureWord',
+        cardGroups: [
+          { category: 'About a Person', cards: ['mom', 'dad', 'girl'] },
+          { category: 'About a Thing', cards: ['bike', 'kite', 'cake'] }
+        ]
+      }]
+    };
+    const r = T(page, {}, 'B3-M03S01', 'B3');
+    eq(r.variant, 'v1', 'pictureWord selects the image-card renderer variant');
+    eq(r.data.cards.map((card) => card.type).join('|'),
+      'image|image|image|image|image|image',
+      'all pictureWord cards use the image shape');
+    eq(r.data.cards.map((card) => card.content).join('|'),
+      'mom.webp|dad.webp|girl.webp|bike.webp|kite.webp|cake.webp',
+      'card slugs match Resource Builder word-image IDs');
+    eq(r.data.cards.map((card) => card.label).join('|'),
+      'mom|dad|girl|bike|kite|cake',
+      'pictureWord labels stay human-readable');
+    eq(r.data.cards.map((card) => card.audio).join('|'),
+      'mom.mp3|dad.mp3|girl.mp3|bike.mp3|kite.mp3|cake.mp3',
+      'pictureWord cards keep Word Audio');
+    eq(r.templateMeta.variantName,
+      'Sort Picture Words (2 Buckets, 6 Cards)',
+      'metadata follows the picture-word contract');
+  });
+
+  runner.check('Circle Word, Find Word, Sort Word, and Ladder render per-card speakers', () => {
+    const circle = T({
+      pageNumber: 1,
+      englishLetterTopicList: [{
+        topicType: 'english_circle_word',
+        targetWord: 'enjoy',
+        options: ['enjoy', 'after', 'enjoy', 'before', 'again', 'enjoy']
+      }]
+    }, {}, 'A5-M04S05', 'A5');
+    const circleHost = document.createElement('div');
+    window.JOJO_RENDERERS['T-CIRCLE'](circle.data, circleHost);
+    eq(circleHost.querySelectorAll('.ws-audio-btn').length, 6,
+      'Circle Word renders one speaker per card');
+    const circleLetter = T({
+      pageNumber: 1,
+      englishLetterTopicList: [{
+        topicType: 'english_circle_word',
+        targetWord: 'd',
+        options: ['d', 'e', 'd', 'f', 'd', 'e']
+      }]
+    }, {}, 'PK-1a', 'PK');
+    eq(circleLetter.data.options.map((option) => option.audio).join('|'),
+      'letter:d.mp3|letter:e.mp3|letter:d.mp3|letter:f.mp3|letter:d.mp3|letter:e.mp3',
+      'Circle Letter routes to Letter Audio without Word Audio fallback');
+
+    const find = T(PAGES.findWord, {}, 'A4-M03S01', 'A4');
+    const findHost = document.createElement('div');
+    window.JOJO_RENDERERS['T-FINDWORD'](find.data, findHost);
+    eq(find.data.target_word_audios.join('|'), 'cat.mp3|pig.mp3|sit.mp3',
+      'Find Word translator derives Word Audio');
+    eq(findHost.querySelectorAll('.ws-audio-btn').length, 3,
+      'Find Word renders one speaker per Word Bank card');
+
+    const sortPage = {
+      pageNumber: 1,
+      englishLetterTopicList: [{
+        topicType: 'english_sort_words',
+        cardDisplay: 'word',
+        cardGroups: [
+          { category: '-at', cards: ['cat', 'mat', 'sat'] },
+          { category: '-og', cards: ['dog', 'hog', 'log'] }
+        ]
+      }]
+    };
+    const sort = T(sortPage, {}, 'A4-M03S01', 'A4');
+    const sortHost = document.createElement('div');
+    window.JOJO_RENDERERS['T-SORT'](sort.data, sortHost);
+    eq(sortHost.querySelectorAll('.ws-audio-btn').length, 6,
+      'Sort Word renders one speaker per card');
+    const silentLetterSort = T({
+      pageNumber: 1,
+      englishLetterTopicList: [{
+        topicType: 'english_sort_words',
+        cardDisplay: 'letter',
+        cardGroups: [
+          { category: 'Uppercase', cards: ['A', 'B', 'C'] },
+          { category: 'Lowercase', cards: ['a', 'b', 'c'] }
+        ]
+      }]
+    }, {}, 'PK-1a', 'PK');
+    eq(silentLetterSort.data.cards.map((card) => card.audio),
+      [null, null, null, null, null, null],
+      'Sort Letters remains intentionally silent');
+
+    const ladderPage = {
+      pageNumber: 1,
+      englishLetterTopicList: [{
+        topicType: 'english_ladder',
+        rime: 'at',
+        rungs: [
+          { word: 'cat', targetText: 'c' },
+          { word: 'mat', targetText: 'm' },
+          { word: 'rat', targetText: 'r' }
+        ]
+      }]
+    };
+    const ladder = T(ladderPage, {}, 'A4-M03S01', 'A4');
+    const ladderHost = document.createElement('div');
+    window.JOJO_RENDERERS['T-LADDER'](ladder.data, ladderHost);
+    eq(ladderHost.querySelectorAll('.ws-audio-btn').length, 3,
+      'Ladder renders one speaker per non-empty rung');
+    const fullRungs = [...ladderHost.querySelectorAll('.ws-ladder-rung')];
+    eq(fullRungs.length, 3, 'Ladder renders all three rungs');
+    fullRungs.forEach((rung, index) => {
+      eq(rung.querySelectorAll('.ws-cell').length, 1,
+        'rung ' + index + ' has exactly one onset writing cell');
+      assert(rung.querySelector('.ws-cell').classList.contains('ws-cell-blank'),
+        'rung ' + index + ' onset cell is blank');
+      eq(rung.querySelector('.ws-cell').textContent, '',
+        'rung ' + index + ' does not reveal the onset answer');
+      eq(rung.querySelector('.ws-ladder-rime').textContent, 'at',
+        'rung ' + index + ' prints the shared rime');
+      eq(rung.querySelector('[data-field$=".hint"]'), null,
+        'rung ' + index + ' does not render the target onset hint');
+    });
+    const partialLadder = T({
+      pageNumber: 1,
+      englishLetterTopicList: [{
+        topicType: 'english_ladder',
+        rime: 'at',
+        rungs: [
+          { word: 'cat', targetText: 'c' },
+          { word: '', targetText: '' },
+          { word: 'rat', targetText: 'r' }
+        ]
+      }]
+    }, {}, 'A4-M03S01', 'A4');
+    eq(partialLadder.data.ladders[0].rungs.map((rung) => rung.audio),
+      ['cat.mp3', null, 'rat.mp3'],
+      'only the deliberately blank partial-ladder rung is silent');
+    const partialHost = document.createElement('div');
+    window.JOJO_RENDERERS['T-LADDER'](partialLadder.data, partialHost);
+    eq(partialHost.querySelectorAll('.ws-cell-blank').length, 3,
+      'partial ladder keeps one blank onset cell on every rung');
+    eq(partialHost.querySelectorAll('.ws-audio-btn').length, 2,
+      'partial ladder keeps the deliberately blank rung silent');
+  });
+
+  runner.check('cardAudioMode=silent suppresses card audio but keeps Instruction Audio', () => {
+    const common = {
+      pageNumber: 1,
+      instructionText: 'Read the words.',
+      instructionKey: 'read_the_words'
+    };
+    const circle = T({
+      ...common,
+      englishLetterTopicList: [{
+        topicType: 'english_circle_word',
+        cardAudioMode: 'silent',
+        targetWord: 'that',
+        options: ['that', 'that', 'that', 'chat', 'than', 'this']
+      }]
+    }, {}, 'A4-M02S03', 'A4');
+    const circleHost = document.createElement('div');
+    window.JOJO_RENDERERS['T-CIRCLE'](circle.data, circleHost);
+    assert(circle.data.options.every((option) =>
+      !Object.prototype.hasOwnProperty.call(option, 'audio')),
+      'silent Circle options omit audio metadata');
+    eq(circleHost.querySelectorAll('.ws-audio-btn').length, 1,
+      'silent Circle renders Instruction Audio only');
+    eq(circle.templateMeta.variantName,
+      'Circle the Word (6 or 8 Silent Cards, Multi-Select)',
+      'silent Circle metadata names the exact variant');
+
+    const find = T({
+      ...common,
+      englishLetterTopicList: [{
+        topicType: 'english_find_word',
+        cardAudioMode: 'silent',
+        words: ['sat', 'flat', 'bat'],
+        options: [
+          ['S', 'A', 'T', 'X'],
+          ['F', 'L', 'A', 'T'],
+          ['B', 'A', 'T', 'Q'],
+          ['X', 'Y', 'Z', 'Q']
+        ]
+      }]
+    }, {}, 'A4-M02S03', 'A4');
+    const findHost = document.createElement('div');
+    window.JOJO_RENDERERS['T-FINDWORD'](find.data, findHost);
+    assert(!Object.prototype.hasOwnProperty.call(find.data, 'target_word_audios'),
+      'silent FINDWORD omits target_word_audios');
+    eq(findHost.querySelectorAll('.ws-audio-btn').length, 1,
+      'silent FINDWORD renders Instruction Audio only');
+    eq(find.templateMeta.variantName,
+      'Find Words in 4×4 Grid (3 Words, Silent Word Bank, ≤4 Letters)',
+      'silent FINDWORD metadata names the exact variant');
+
+    const sortPage = {
+      ...common,
+      englishLetterTopicList: [{
+        topicType: 'english_sort_words',
+        cardDisplay: 'word',
+        cardAudioMode: 'silent',
+        cardGroups: [
+          { category: '-at', cards: ['cat', 'bat', 'mat'] },
+          { category: '-og', cards: ['dog', 'log', 'frog'] }
+        ]
+      }]
+    };
+    const before = T(sortPage, {}, 'A4-M02S03', 'A4');
+    sortPage.englishLetterTopicList[0].cardGroups[0].cards[0] = 'sat';
+    const after = T(sortPage, {}, 'A4-M02S03', 'A4');
+    const sortHost = document.createElement('div');
+    window.JOJO_RENDERERS['T-SORT'](after.data, sortHost);
+    assert(before.data.cards.concat(after.data.cards).every((card) =>
+      !Object.prototype.hasOwnProperty.call(card, 'audio')),
+      'silent Sort stays silent after an upstream card overwrite');
+    eq(sortHost.querySelectorAll('.ws-audio-btn').length, 1,
+      'silent Sort renders Instruction Audio only');
+    eq(after.templateMeta.variantName,
+      'Sort Words (2 Buckets, 6 Silent Cards)',
+      'silent Sort metadata names the exact variant');
+  });
+
+  runner.check('card audio is re-derived after an upstream Page JSON overwrite', () => {
+    const page = {
+      pageNumber: 1,
+      englishLetterTopicList: [{
+        topicType: 'english_sort_words',
+        cardDisplay: 'word',
+        cardGroups: [
+          { category: 'A', cards: ['tent'] },
+          { category: 'B', cards: ['herb'] }
+        ]
+      }]
+    };
+    const before = T(page, {}, 'A5-M04S05', 'A5');
+    page.englishLetterTopicList[0].cardGroups[0].cards[0] = 'enjoy';
+    const after = T(page, {}, 'A5-M04S05', 'A5');
+    eq(before.data.cards[0].audio, 'tent.mp3',
+      'first translation uses the original card');
+    eq(after.data.cards[0].audio, 'enjoy.mp3',
+      'rerun derives audio from current Page JSON');
+  });
+
+  runner.check('picture_to_word keeps playable top words and silent bottom pictures', () => {
+    const page = {
+      pageNumber: 1,
+      instructionText: 'Listen to the word. Draw a line to match it to the picture.',
+      englishLetterTopicList: [{
+        topicType: 'english_matching',
+        matchType: 'picture_to_word',
+        topItems: [
+          { id: 't1', value: 'round' },
+          { id: 't2', value: 'tall' }
+        ],
+        bottomItems: [
+          { id: 'b1', value: 'ball' },
+          { id: 'b2', value: 'tree' }
+        ],
+        correctPairs: ['t1-b1', 't2-b2']
+      }]
+    };
+    const r = T(page, {}, 'C1-M05S01', 'C1');
+    eq(r.data.match_type, 'picture_to_word', 'renderer receives the subtype discriminator');
+    eq(r.data.pairs[0].left.content, 'round', 'topItems remain visible word text');
+    eq(r.data.pairs[0].left.audio, 'round.mp3', 'top word owns its Word Audio');
+    eq(r.data.pairs[0].right.content, 'ball.webp', 'bottomItems resolve to Word Image');
+    eq(r.data.pairs[0].right.audio, undefined, 'bottom picture has no audio metadata');
+  });
+
+  runner.check('picture_to_word retranslation follows upstream word changes', () => {
+    const page = {
+      pageNumber: 1,
+      englishLetterTopicList: [{
+        topicType: 'english_matching',
+        matchType: 'picture_to_word',
+        topItems: [{ id: 't1', value: 'round' }],
+        bottomItems: [{ id: 'b1', value: 'ball' }],
+        correctPairs: ['t1-b1']
+      }]
+    };
+    const before = T(page, {}, 'C1-M05S01', 'C1');
+    page.englishLetterTopicList[0].topItems[0].value = 'bright';
+    const after = T(page, {}, 'C1-M05S01', 'C1');
+    eq(before.data.pairs[0].left.audio, 'round.mp3', 'first translation uses the original word');
+    eq(after.data.pairs[0].left.audio, 'bright.mp3', 'rerun derives the new audio key');
+    eq(after.data.pairs[0].left.content, 'bright', 'rerun derives the new visible word');
+  });
+
+  runner.check('picture_to_picture_rhyme renders playable Word Images on both sides', () => {
+    const page = {
+      pageNumber: 191,
+      instructionText: 'Listen to each picture name. Draw a line to the picture that rhymes.',
+      englishLetterTopicList: [{
+        topicType: 'english_matching',
+        matchType: 'picture_to_rhyme',
+        pairMode: 'picture_to_picture_rhyme',
+        topItems: [
+          { id: 't1', value: 'pumpkin' },
+          { id: 't2', value: 'basket' }
+        ],
+        bottomItems: [
+          { id: 'b1', value: 'blanket' },
+          { id: 'b2', value: 'napkin' }
+        ],
+        correctPairs: ['t1-b2', 't2-b1']
+      }]
+    };
+    const r = T(page, {}, 'A5-M03S02', 'A5');
+    eq(r.data.match_type, 'picture_to_rhyme', 'public matchType stays canonical');
+    eq(r.data.pairs[0].left,
+      { content: 'pumpkin.webp', type: 'image', audio: 'pumpkin.mp3' },
+      'left noun resolves to playable Word Image and Word Audio');
+    eq(r.data.pairs[0].right,
+      { content: 'napkin.webp', type: 'image', audio: 'napkin.mp3' },
+      'right noun resolves to playable Word Image and Word Audio');
+  });
+
+  runner.check('canonical picture_to_rhyme adds Rime Audio to the family right side', () => {
+    const page = {
+      pageNumber: 121,
+      englishLetterTopicList: [{
+        topicType: 'english_matching',
+        matchType: 'picture_to_rhyme',
+        topItems: [{ id: 't1', value: 'mice' }],
+        bottomItems: [{ id: 'b1', value: '-ice' }],
+        correctPairs: ['t1-b1']
+      }]
+    };
+    const r = T(page, {}, 'A5-M02S01', 'A5');
+    eq(r.data.pairs[0].left,
+      { content: 'mice.webp', type: 'image', audio: 'mice.mp3' },
+      'canonical left side remains a playable picture');
+    eq(r.data.pairs[0].right,
+      { content: '-ice', type: 'word', audio: 'rime:ice.mp3' },
+      'canonical right side uses its exact Rime Audio identity');
+  });
+
+  runner.check('sound_to_word uses top phoneme IDs and bottom Word Audio without images', () => {
+    const page = {
+      pageNumber: 20,
+      instructionText: 'Match each sound to the word that starts with it.',
+      englishLetterTopicList: [{
+        topicType: 'english_matching',
+        matchType: 'sound_to_word',
+        topItems: [
+          { id: 't1', value: 'sh', phoneme_id: 'digraph_sh' },
+          { id: 't2', value: 't', phoneme_id: 'onset_t' },
+          { id: 't3', value: 'f', phoneme_id: 'onset_f' },
+          { id: 't4', value: 'd', phoneme_id: 'onset_d' }
+        ],
+        bottomItems: [
+          { id: 'b1', value: 'five' },
+          { id: 'b2', value: 'dime' },
+          { id: 'b3', value: 'tape' },
+          { id: 'b4', value: 'shade' }
+        ],
+        correctPairs: ['t1-b4', 't2-b3', 't3-b1', 't4-b2']
+      }]
+    };
+    const r = T(page, {}, 'A5-M01S01', 'A5');
+    eq(r.data.match_type, 'sound_to_word', 'renderer receives the subtype discriminator');
+    eq(r.data.pairs[0].left,
+      { content: 'sh', type: 'word', audio: 'phoneme:digraph_sh.mp3' },
+      'top sound uses phoneme_id and has no image');
+    eq(r.data.pairs[0].right,
+      { content: 'shade', type: 'word', audio: 'shade.mp3' },
+      'bottom word uses Word Audio and has no image');
+    eq(r.templateMeta.variantName,
+      'Match Sound to Word (4 Pairs)',
+      'metadata follows sound_to_word contract');
+  });
+
+  runner.check('sound_to_word retranslation follows upstream phoneme and word changes', () => {
+    const page = {
+      pageNumber: 20,
+      englishLetterTopicList: [{
+        topicType: 'english_matching',
+        matchType: 'sound_to_word',
+        topItems: [{ id: 't1', value: 'sh', phoneme_id: 'digraph_sh' }],
+        bottomItems: [{ id: 'b1', value: 'shade' }],
+        correctPairs: ['t1-b1']
+      }]
+    };
+    const before = T(page, {}, 'A5-M01S01', 'A5');
+    page.englishLetterTopicList[0].topItems[0] = {
+      id: 't1', value: 'ch', phoneme_id: 'digraph_ch'
+    };
+    page.englishLetterTopicList[0].bottomItems[0].value = 'chase';
+    const after = T(page, {}, 'A5-M01S01', 'A5');
+    eq(before.data.pairs[0].left.audio,
+      'phoneme:digraph_sh.mp3',
+      'first translation uses the original phoneme identity');
+    eq(after.data.pairs[0].left.audio,
+      'phoneme:digraph_ch.mp3',
+      'rerun derives the new phoneme identity');
+    eq(after.data.pairs[0].right.audio,
+      'chase.mp3',
+      'rerun derives the new bottom Word Audio identity');
+    eq(after.data.pairs[0].right.content,
+      'chase',
+      'rerun derives the new bottom word text');
+  });
+
+  runner.check('synonym keeps text on both rows with Word Audio on both sides', () => {
+    const page = {
+      pageNumber: 1,
+      englishLetterTopicList: [{
+        topicType: 'english_matching',
+        matchType: 'synonym',
+        topItems: [
+          { id: 't1', value: 'good' },
+          { id: 't2', value: 'quick' }
+        ],
+        bottomItems: [
+          { id: 'b1', value: 'well' },
+          { id: 'b2', value: 'quickly' }
+        ],
+        correctPairs: ['t1-b1', 't2-b2']
+      }]
+    };
+    const r = T(page, {}, 'C1-M05S03', 'C1');
+    eq(r.data.match_type, 'synonym', 'renderer receives the synonym discriminator');
+    eq(r.data.pairs[0].left, { content: 'good', type: 'word', audio: 'good.mp3' }, 'top synonym word owns audio');
+    eq(r.data.pairs[0].right, { content: 'well', type: 'word', audio: 'well.mp3' }, 'bottom synonym word owns audio');
+  });
+
+  runner.check('antonym keeps text on both rows with Word Audio on both sides', () => {
+    const page = {
+      pageNumber: 1,
+      englishLetterTopicList: [{
+        topicType: 'english_matching',
+        matchType: 'antonym',
+        topItems: [{ id: 't1', value: 'big' }],
+        bottomItems: [{ id: 'b1', value: 'small' }],
+        correctPairs: ['t1-b1']
+      }]
+    };
+    const r = T(page, {}, 'B3-M06S02', 'B3');
+    eq(r.data.match_type, 'antonym', 'renderer receives the antonym discriminator');
+    eq(r.data.pairs[0].left.audio, 'big.mp3', 'top antonym word owns audio');
+    eq(r.data.pairs[0].right.audio, 'small.mp3', 'bottom antonym word owns audio');
+  });
+
+  runner.check('synonym retranslation follows upstream bottom-word changes', () => {
+    const page = {
+      pageNumber: 1,
+      englishLetterTopicList: [{
+        topicType: 'english_matching',
+        matchType: 'synonym',
+        topItems: [{ id: 't1', value: 'good' }],
+        bottomItems: [{ id: 'b1', value: 'well' }],
+        correctPairs: ['t1-b1']
+      }]
+    };
+    const before = T(page, {}, 'C1-M05S03', 'C1');
+    page.englishLetterTopicList[0].bottomItems[0].value = 'nicely';
+    const after = T(page, {}, 'C1-M05S03', 'C1');
+    eq(before.data.pairs[0].right.audio, 'well.mp3', 'first translation uses the original bottom word');
+    eq(after.data.pairs[0].right.audio, 'nicely.mp3', 'rerun derives the new bottom audio key');
+    eq(after.data.pairs[0].right.content, 'nicely', 'rerun derives the new bottom text');
+  });
+
+  runner.check('picture-to-word override changes image only', () => {
+    const page = {
+      pageNumber: 177,
+      englishLetterTopicList: [{
+        topicType: 'english_matching', matchType: 'picture_to_word',
+        topItems: [{ id: 't1', value: 'red' }],
+        bottomItems: [{ id: 'b1', value: 'red' }],
+        correctPairs: ['t1-b1'],
+        wordImageOverrides: [{ word: 'red', imageKey: 'color_red_crayon' }]
+      }]
+    };
+    const r = T(page, {}, 'A1-M04S01', 'A1');
+    eq(r.data.pairs[0].left.content, 'red', 'learner label remains lexical');
+    eq(r.data.pairs[0].left.audio, 'red.mp3', 'Word Audio remains lexical');
+    eq(r.data.pairs[0].right.content, 'color_red_crayon.webp', 'picture uses custom key');
+    eq(r.data.pairs[0].right.audio, undefined, 'picture stays silent');
+  });
+
+  runner.check('sort picture-word override keeps label and audio', () => {
+    const page = {
+      pageNumber: 178,
+      englishLetterTopicList: [{
+        topicType: 'english_sort_words', cardDisplay: 'pictureWord',
+        cardGroups: [
+          { category: 'Colors', cards: ['red'] },
+          { category: 'Numbers', cards: ['one'] }
+        ],
+        wordImageOverrides: [
+          { word: 'one', imageKey: 'number_one_ten_frame' },
+          { word: 'red', imageKey: 'color_red_crayon' }
+        ]
+      }]
+    };
+    const r = T(page, {}, 'A1-M04S01', 'A1');
+    eq(r.data.cards[0].content, 'color_red_crayon.webp', 'color image key');
+    eq(r.data.cards[0].label, 'red', 'color label');
+    eq(r.data.cards[0].audio, 'red.mp3', 'color Word Audio');
+    eq(r.data.cards[1].content, 'number_one_ten_frame.webp', 'number image key');
+    eq(r.data.cards[1].audio, 'one.mp3', 'number Word Audio');
+  });
+
+  runner.check('circle picture override keeps lexical option semantics', () => {
+    const page = {
+      pageNumber: 179,
+      englishLetterTopicList: [{
+        topicType: 'english_circle_picture',
+        options: ['red', 'green'], correctWords: ['green'],
+        wordImageOverrides: [
+          { word: 'green', imageKey: 'color_green_crayon' },
+          { word: 'red', imageKey: 'color_red_crayon' }
+        ]
+      }]
+    };
+    const r = T(page, {}, 'A1-M04S01', 'A1');
+    eq(r.kind, 'circle_multi', 'custom circle renderer selected');
+    eq(r.rows[0].options, ['red', 'green'], 'labels remain lexical');
+    eq(r.rows[0].imageKeys,
+      ['color_red_crayon', 'color_green_crayon'], 'images use custom keys');
+    eq(r.rows[0].correct, ['green'], 'answer set remains lexical');
   });
 
   runner.done();

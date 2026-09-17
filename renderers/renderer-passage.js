@@ -149,6 +149,7 @@ window.JOJO_RENDERERS['T-PASSAGE'] = function (data, container) {
     } else if (q.response_type === 'type') {
       var typing = R.typingArea(q.answer_lines || 2, 'Type your answer...', q.answer);
       typing.style.marginLeft = '36px';
+      typing.style.width = 'calc(100% - 36px)';
       R.annotate(typing, 'questions[' + qi + '].answer');
       qBlock.appendChild(typing);
     }

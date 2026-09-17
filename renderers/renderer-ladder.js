@@ -65,28 +65,31 @@ window.JOJO_RENDERERS['T-LADDER'] = function (data, container) {
       stepNum.textContent = (actualIndex + 1);
       rungEl.appendChild(stepNum);
 
-      // Hint letter
-      var hintEl = document.createElement('span');
-      hintEl.style.fontFamily = '"Andika", "Comic Neue", sans-serif';
-      hintEl.style.fontSize = '22px';
-      hintEl.style.fontWeight = '700';
-      hintEl.style.color = 'var(--jojo-teal)';
-      hintEl.style.width = '24px';
-      hintEl.textContent = rung.hint;
-      R.annotate(hintEl, 'ladders[' + li + '].rungs[' + actualIndex + '].hint');
-      rungEl.appendChild(hintEl);
-
-      // Writing cells for the full word
+      // The learner writes only the onset. The target onset remains answer data
+      // and must not be rendered as a trace hint.
       var cellGroup = document.createElement('div');
       cellGroup.className = 'ws-soundbox-group';
-      var answer = rung.answer || '';
-      answer.split('').forEach(function (ch, ci) {
-        var scaffold = ci === 0 ? 'trace' : 'answer';
-        cellGroup.appendChild(R.writingCell(cellSize, scaffold, ch));
-      });
+      cellGroup.appendChild(R.writingCell(cellSize, 'blank', ''));
       rungEl.appendChild(cellGroup);
 
+      // The shared rime is printed beside the single writable onset cell.
+      var rimeEl = document.createElement('span');
+      rimeEl.className = 'ws-ladder-rime';
+      rimeEl.style.fontFamily = '"Andika", "Comic Neue", sans-serif';
+      rimeEl.style.fontSize = '22px';
+      rimeEl.style.fontWeight = '700';
+      rimeEl.style.color = 'var(--jojo-teal)';
+      rimeEl.textContent = ladder.rime || '';
+      R.annotate(rimeEl, 'ladders[' + li + '].rime');
+      rungEl.appendChild(rimeEl);
+
       // Image
+      if (rung.audio) {
+        var audioBtn = R.audioButton(rung.audio);
+        R.annotate(audioBtn, 'ladders[' + li + '].rungs[' + actualIndex + '].audio');
+        rungEl.appendChild(audioBtn);
+      }
+
       if (rung.image) {
         var img = R.imagePlaceholder(rung.image, 40, 40);
         R.annotate(img, 'ladders[' + li + '].rungs[' + actualIndex + '].image');

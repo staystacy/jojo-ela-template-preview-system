@@ -18,6 +18,7 @@ window.JOJO_RENDERERS['T-FINDWORD'] = function (data, container) {
     targetBar.style.justifyContent = 'center';
     targetBar.style.flexWrap = 'wrap';
 
+    var targetAudios = data.target_word_audios || [];
     targets.forEach(function (word, i) {
       var tag = document.createElement('span');
       tag.style.fontFamily = '"Andika", "Comic Neue", sans-serif';
@@ -28,7 +29,15 @@ window.JOJO_RENDERERS['T-FINDWORD'] = function (data, container) {
       tag.style.border = '2px solid var(--jojo-teal)';
       tag.style.borderRadius = '20px';
       tag.style.color = 'var(--jojo-teal)';
-      tag.textContent = word;
+      tag.style.display = 'inline-flex';
+      tag.style.alignItems = 'center';
+      tag.style.gap = '8px';
+      if (targetAudios[i]) {
+        var audioBtn = R.audioButton(targetAudios[i]);
+        R.annotate(audioBtn, 'target_word_audios[' + i + ']');
+        tag.appendChild(audioBtn);
+      }
+      tag.appendChild(document.createTextNode(word));
       R.annotate(tag, 'target_words[' + i + ']');
       targetBar.appendChild(tag);
     });
@@ -53,6 +62,10 @@ function renderGrid(data, container, R) {
   var rows = grid.length;
   var cols = grid[0] ? grid[0].length : 5;
   var targets = (data.target_words || []).map(function (w) { return w.toLowerCase(); });
+  var exampleWord = targets[0] || '';
+  var exampleRow = grid[0]
+    ? grid[0].slice(0, exampleWord.length).join('').toLowerCase()
+    : '';
 
   // Center the grid
   var gridWrapper = document.createElement('div');
@@ -71,8 +84,12 @@ function renderGrid(data, container, R) {
       cellEl.style.height = '44px';
       cellEl.textContent = cell;
 
-      if (targets.indexOf(cell.toLowerCase()) !== -1) {
+      // The first target is the worked example. The Page contract fixes it at
+      // row 0, column 0, moving right, so show those cells as pre-highlighted.
+      if (ri === 0 && ci < exampleWord.length && exampleRow === exampleWord) {
+        cellEl.classList.add('ws-findword-example');
         cellEl.style.background = 'var(--demo-bg)';
+        cellEl.style.color = 'var(--jojo-teal)';
         cellEl.style.fontWeight = '800';
       }
 
@@ -108,10 +125,7 @@ function renderParagraph(data, container, R) {
   R.annotate(para, 'paragraph');
   container.appendChild(para);
 
-  requestAnimationFrame(function () {
-    var svg = R.svgOverlay();
-    para.appendChild(svg);
-    var pRect = para.getBoundingClientRect();
+  R.svgOverlayIn(para, function (svg, pRect) {
     var wordEls = para.querySelectorAll('.ws-target-word');
     wordEls.forEach(function (el, i) {
       var r = el.getBoundingClientRect();

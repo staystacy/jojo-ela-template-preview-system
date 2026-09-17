@@ -130,11 +130,9 @@
       }
     };
     if (hint && tryCategory[hint]) {
-      const url = tryCategory[hint]();
-      if (url) return url;
+      return tryCategory[hint]();
     }
     for (const cat of ['phoneme', 'word', 'rime', 'instruction', 'sentence', 'letter', 'passage']) {
-      if (cat === hint) continue;
       const url = tryCategory[cat]();
       if (url) return url;
     }
@@ -357,8 +355,9 @@
             'phoneme:' + (r.onset_phoneme_id || r.onset) + '.mp3',
             'rime:'    + (r.rime_id          || r.rime ) + '.mp3'
           ],
-          phoneme_labels: ['/' + r.onset + '/', '/' + r.rime + '/'],
-          image: (r.imageName || r.word) + '.webp',
+          // These are orthographic onset-rime chunks, not IPA transcriptions.
+          phoneme_labels: [r.onset, r.rime],
+          image: r.imageName ? r.imageName + '.webp' : null,
           answer: r.answer || r.word
         }))
       }
@@ -451,6 +450,11 @@
         instruction_text: ctx.instructionText,
         instruction_audio: ctx.instructionAudio,
         target_words: (t.words || []).map((w) => String(w).toLowerCase()),
+        ...(t.cardAudioMode === 'silent' ? {} : {
+          target_word_audios: (t.words || []).map((w) =>
+            String(w).toLowerCase() + '.mp3'
+          )
+        }),
         grid: (t.options || []).map((row) =>
           row.map((c) => String(c).toLowerCase())
         )
@@ -458,33 +462,107 @@
     };
   }
 
+  function wordImageKey(topic, word) {
+    const overrides = topic && Array.isArray(topic.wordImageOverrides)
+      ? topic.wordImageOverrides : [];
+    const hit = overrides.find((entry) => entry && entry.word === word);
+    return hit && hit.imageKey ? String(hit.imageKey) : String(word);
+  }
+
   function translateMatching(topics, ctx) {
     const t = topics[0];
     if (!t || !t.topItems || !t.bottomItems || !t.correctPairs) {
       throw new Error('matching topic missing required fields');
     }
-    const topMap = Object.fromEntries(t.topItems.map((x) => [x.id, x.value]));
+    const topMap = Object.fromEntries(t.topItems.map((x) => [x.id, x]));
     const botMap = Object.fromEntries(t.bottomItems.map((x) => [x.id, x.value]));
     const matchType = t.matchType || 'picture_to_word';
-    // Every picture_to_* variant puts the picture on the left with word audio;
-    // the right column carries the text to match (word / rime label / letter).
-    // picture_to_rhyme and picture_to_letter used to fall through to the text
-    // branch, so their pictures rendered as bare words.
-    const PICTURE_LEFT = ['picture_to_word', 'picture_to_rhyme', 'picture_to_letter'];
+    // picture_to_word follows the live top/bottom Page JSON contract: topItems
+    // are visible/playable words and bottomItems are silent picture keys.
+    // Other picture_to_* variants retain their existing picture-first mapping.
+    const pictureToPictureRhyme = matchType === 'picture_to_rhyme'
+      && t.pairMode === 'picture_to_picture_rhyme';
+    const PICTURE_LEFT = ['picture_to_rhyme', 'picture_to_letter'];
     const leftIsImage = PICTURE_LEFT.indexOf(matchType) !== -1;
-    const pairs = t.correctPairs.map((pairStr) => {
-      const [topId, botId] = String(pairStr).split('-');
-      const leftValue = topMap[topId];
+    const rightIsImage = matchType === 'picture_to_word' || pictureToPictureRhyme;
+    // What each ROW plays, per ELA_Template_40-DrawLine.md. Every variant states
+    // BOTH sides on purpose: the old code listed only the matchTypes whose
+    // bottom row spoke, so a variant nobody listed shipped mute — that is how
+    // letter_case's lowercase row and picture_to_letter's uppercase row lost
+    // their speakers. 'silent' is reserved for a card that IS the answer.
+    const MATCH_AUDIO = {
+      letter_case:       { top: 'letter',  bottom: 'letter' },
+      picture_to_word:   { top: 'word',    bottom: 'silent' },  // bottom picture = the answer
+      picture_to_letter: { top: 'word',    bottom: 'letter' },
+      picture_to_rhyme:  { top: 'word',    bottom: 'rime'   },
+      sound_to_word:     { top: 'phoneme', bottom: 'word'   },
+      synonym:           { top: 'word',    bottom: 'word'   },
+      antonym:           { top: 'word',    bottom: 'word'   }
+    };
+    const audioPlan = MATCH_AUDIO[matchType] || { top: 'word', bottom: 'word' };
+    // picture_to_picture_rhyme pairs two pictures; the bottom one speaks its word.
+    const bottomKind = pictureToPictureRhyme ? 'word' : audioPlan.bottom;
+
+    // Category prefixes are required wherever the token is NOT a word: audio/word/
+    // holds a.mp3 and i.mp3 (the sight words), and the unhinted resolver tries
+    // `word` before `letter`, so a bare "a.mp3" on a letter card plays the sight
+    // word instead of the letter name.
+    function cardAudio(kind, value) {
+      if (kind === 'silent' || value == null || value === '') return null;
+      if (kind === 'letter')  return 'letter:' + value + '.mp3';
+      if (kind === 'phoneme') return 'phoneme:' + value + '.mp3';
+      if (kind === 'rime') {
+        return 'rime:' + String(value).trim().replace(/^-+/, '').toLowerCase() + '.mp3';
+      }
+      return value + '.mp3';
+    }
+
+    // The preview has to show the page the way the Page JSON lays it out: top
+    // row in topItems order, bottom row in bottomItems order. Walking
+    // correctPairs instead made the top row follow the order the pairs happened
+    // to be written in.
+    const bottomIdForTop = new Map(
+      t.correctPairs.map((pairStr) => String(pairStr).split('-'))
+    );
+    const pairs = t.topItems.map((topItem) => {
+      const botId = bottomIdForTop.get(topItem.id);
+      const leftValue = topItem.value;
       const rightValue = botMap[botId];
       const left = leftIsImage
-        ? { content: leftValue + '.webp', type: 'image', audio: leftValue + '.mp3' }
-        : { content: leftValue, type: 'word', audio: leftValue + '.mp3' };
-      return { left, right: { content: rightValue, type: 'word' } };
+        ? { content: leftValue + '.webp', type: 'image' }
+        : { content: leftValue, type: 'word' };
+      const right = rightIsImage
+        ? { content: wordImageKey(t, rightValue) + '.webp', type: 'image' }
+        : { content: rightValue, type: 'word' };
+
+      const leftAudio = cardAudio(
+        audioPlan.top,
+        audioPlan.top === 'phoneme' ? topItem.phoneme_id : leftValue
+      );
+      if (leftAudio) left.audio = leftAudio;
+      const rightAudio = cardAudio(bottomKind, rightValue);
+      if (rightAudio) right.audio = rightAudio;
+
+      return { left, right };
     });
+    // Where each pair's bottom card sits, straight from bottomItems. Null when
+    // the pairing is not a clean bijection, so the renderer falls back rather
+    // than dropping or duplicating a card.
+    const pairIndexByBottomId = new Map();
+    t.topItems.forEach((topItem, index) => {
+      pairIndexByBottomId.set(bottomIdForTop.get(topItem.id), index);
+    });
+    const bottomOrder = t.bottomItems.map((b) => pairIndexByBottomId.get(b.id));
+    const bottomOrderIsComplete =
+      bottomOrder.length === pairs.length
+      && bottomOrder.every((index) => Number.isInteger(index))
+      && new Set(bottomOrder).size === pairs.length;
     return {
       kind: 'legacy',
       templateId: 'T-MATCH',
       variant: 'v2',
+      // pairs now follow topItems, so this index is the topItems index it has
+      // always claimed to be.
       sourceTraces: pairs.map((p, i) => {
         const stm = t.source_trace_map || {};
         return stm['topItems[' + i + '].value'] || null;
@@ -496,7 +574,9 @@
         grade: ctx.grade,
         instruction_text: ctx.instructionText,
         instruction_audio: ctx.instructionAudio,
-        pairs
+        match_type: matchType,
+        pairs,
+        bottom_order: bottomOrderIsComplete ? bottomOrder : null
       }
     };
   }
@@ -507,6 +587,8 @@
       throw new Error('circle_word topic missing options');
     }
     const target = t.targetWord;
+    const isLetter = typeof target === 'string'
+      && /^[A-Za-z]$/.test(target.trim());
     return {
       kind: 'legacy',
       templateId: 'T-CIRCLE',
@@ -521,11 +603,19 @@
         instruction_audio: ctx.instructionAudio,
         select_mode: 'multi',
         target_word: target,
-        options: t.options.map((w) => ({
-          content: w,
-          type: 'word',
-          correct: w === target
-        }))
+        options: t.options.map((w) => {
+          const option = {
+            content: w,
+            type: 'word',
+            correct: w === target
+          };
+          if (t.cardAudioMode !== 'silent') {
+            option.audio = isLetter
+              ? 'letter:' + String(w).toLowerCase() + '.mp3'
+              : String(w).toLowerCase() + '.mp3';
+          }
+          return option;
+        })
       }
     };
   }
@@ -536,6 +626,8 @@
       throw new Error('circle_picture_rhyme topic missing options');
     }
     const correct = t.correctAnswer || (t.correctWords && t.correctWords[0]) || '';
+    const targetRime = String(t.targetRime || '').trim()
+      .replace(/^-+/, '').toLowerCase();
     return {
       kind: 'legacy',
       templateId: 'T-CIRCLE',
@@ -549,6 +641,10 @@
         instruction: ctx.instructionText,
         instruction_audio: ctx.instructionAudio,
         select_mode: 'single',
+        // Display form as authored ("-ick"); page_contract CHECK-C validates it
+        // against the instruction, so show the page's own value, not a guess.
+        target_rime: String(t.targetRime || '').trim() || null,
+        target_rime_audio: targetRime ? 'rime:' + targetRime + '.mp3' : null,
         options: t.options.map((w) => ({
           content: w + '.webp',
           label: w,
@@ -565,15 +661,17 @@
     if (!t || !Array.isArray(t.cardGroups)) {
       throw new Error('sort_words topic missing cardGroups');
     }
+    const isPictureWord = t.cardDisplay === 'pictureWord';
+    const variant = isPictureWord ? 'v1' : 'v2';
     return {
       kind: 'legacy',
       templateId: 'T-SORT',
-      variant: 'v2',
+      variant: variant,
       sourceTraces: null,
       data: {
         page_id: ctx.pageId,
         template_id: 'T-SORT',
-        variant: 'v2',
+        variant: variant,
         grade: ctx.grade,
         instruction_text: ctx.instructionText,
         instruction_audio: ctx.instructionAudio,
@@ -582,11 +680,21 @@
           id: 'b' + i
         })),
         cards: t.cardGroups.flatMap((g, i) =>
-          (g.cards || []).map((c) => ({
-            content: String(c),
-            type: 'word',
-            correct_bucket: 'b' + i
-          }))
+          (g.cards || []).map((c) => {
+            const card = {
+              content: (isPictureWord ? wordImageKey(t, c) : String(c))
+                + (isPictureWord ? '.webp' : ''),
+              label: isPictureWord ? String(c) : undefined,
+              type: isPictureWord ? 'image' : 'word',
+              correct_bucket: 'b' + i
+            };
+            if (t.cardDisplay === 'letter') {
+              card.audio = null;
+            } else if (t.cardAudioMode !== 'silent') {
+              card.audio = String(c).toLowerCase() + '.mp3';
+            }
+            return card;
+          })
         )
       }
     };
@@ -628,6 +736,15 @@
     };
   }
 
+  // Word label follows the case being practiced ("Apple" for A, "apple" for a).
+  function caseWord(word, isUpper) {
+    if (!word) return null;
+    return isUpper ? word.charAt(0).toUpperCase() + word.slice(1) : word.toLowerCase();
+  }
+
+  // T-TRACE 1/2 — Letter Tracing (4 Cells, 1 Word Card).
+  // Spec: exactly 4 ruled cells, every one a trace guide; left column is the
+  // model letter card + letter audio + picture + word label.
   function translateTraceLetter(topics, ctx) {
     const t = topics[0];
     if (!t || !t.letter) {
@@ -648,38 +765,58 @@
         grade: ctx.grade,
         instruction_text: ctx.instructionText,
         instruction_audio: ctx.instructionAudio,
-        cell_size: 56,
+        layout: 'letter_ruled',
+        grid_columns: 2,
         demo_area: {
           content: letter,
           animation: 'stroke_order',
-          // 'letter:' prefix forces resolver to look up letter category first,
-          // so word/a.mp3 doesn't hijack letter/A.mp3 when both exist.
-          audio: 'letter:' + letter.toLowerCase() + '.mp3',
+          // The single speaker on this layout plays the WORD, not the letter
+          // (confirmed against the App). 'word:' prefix pins the resolver to the
+          // word category so letter/A.mp3 can't hijack word/a.mp3.
+          audio: t.word ? 'word:' + t.word + '.mp3' : null,
           image: t.word ? t.word + '.webp' : null,
-          word: t.word || null
+          word: caseWord(t.word, isUpper)
         },
-        cells: [
-          { scaffold: 'trace', content: letter },
-          { scaffold: 'trace', content: letter },
-          { scaffold: 'faded', content: letter },
-          { scaffold: 'faded', content: letter },
-          { scaffold: 'blank', content: letter },
-          { scaffold: 'blank', content: letter },
-          { scaffold: 'blank', content: letter },
-          { scaffold: 'blank', content: letter }
-        ]
+        cells: Array.from({ length: 4 }, () => ({ scaffold: 'trace', content: letter }))
       }
     };
   }
 
+  // T-TRACE 3/4/5/6/7 — Shadow / Guided to Freehand / Freehand Writing (10 Cells).
+  // Variant is decided by letter + showHint, matching TEMPLATE_META:
+  //   "Aa"            → v5 guided to freehand, row 1 uppercase / row 2 lowercase,
+  //                     each row 2 guided cells then 3 freehand cells, 1 word card
+  //   showHint true   → v3 / v4 shadow writing, all 10 cells guided
+  //   showHint false  → v6 / v7 freehand writing, all 10 cells blank
   function translateShadowWriting(topics, ctx) {
     const t = topics[0];
     if (!t || !t.letter) {
       throw new Error('shadow_writing topic missing letter');
     }
     const letter = t.letter;
-    const isUpper = /^[A-Z]$/.test(letter);
-    const variant = isUpper ? 'v3' : 'v4';
+    const isMixed = letter.length > 1;          // "Aa", "Ff", ...
+    const showHint = t.showHint !== false;      // default true
+    const isUpper = /^[A-Z]/.test(letter);
+    const variant = isMixed ? 'v5'
+      : showHint ? (isUpper ? 'v3' : 'v4')
+      : (isUpper ? 'v6' : 'v7');
+
+    // 10 cells laid out as 2 rows × 5 columns.
+    let cells;
+    if (isMixed) {
+      const upper = letter.charAt(0);
+      const lower = letter.charAt(1);
+      cells = [upper, lower].reduce((acc, ch) => acc.concat(
+        Array.from({ length: 5 }, (_, i) => ({
+          scaffold: i < 2 ? 'trace' : 'blank', content: ch
+        }))
+      ), []);
+    } else {
+      cells = Array.from({ length: 10 }, () => ({
+        scaffold: showHint ? 'trace' : 'blank', content: letter
+      }));
+    }
+
     return {
       kind: 'legacy',
       templateId: 'T-TRACE',
@@ -692,7 +829,8 @@
         grade: ctx.grade,
         instruction_text: ctx.instructionText,
         instruction_audio: ctx.instructionAudio,
-        cell_size: 48,
+        layout: 'letter_ruled',
+        grid_columns: 5,
         demo_area: {
           content: letter,
           animation: 'stroke_order',
@@ -700,10 +838,10 @@
           audio: 'letter:' + letter[0].toLowerCase() + '.mp3',
           image: null,
           wordCards: (t.wordList || []).filter(Boolean).map(w => ({
-            word: w, image: w + '.webp', audio: w + '.mp3'
+            word: w, label: caseWord(w, isUpper), image: w + '.webp', audio: w + '.mp3'
           }))
         },
-        cells: Array.from({ length: 10 }, () => ({ scaffold: 'faded', content: letter }))
+        cells: cells
       }
     };
   }
@@ -731,7 +869,7 @@
         cell_size: 40,
         items: t.items.map((it) => ({
           original: it.sourceWord,
-          rule: 'add_silent_e',
+          rule: isPicture ? 'add_silent_e' : (it.hint || null),
           answer: it.answer,
           // v2605.25: image / audio key derived from words; no imageName/audioName field anymore.
           // Picture variant (v1) gets dual audio: sourceWord ("hop") + new word ("hope").
@@ -772,7 +910,8 @@
             return {
               hint: r.targetText || '',
               answer: r.word || '',
-              image: isBlank ? null : (r.word + '.webp')
+              image: isBlank ? null : (r.word + '.webp'),
+              audio: isBlank ? null : (r.word + '.mp3')
             };
           })
         }))
@@ -817,7 +956,12 @@
             const key = norm(ew);                                    // matches renderer's errorMap[clean]
             const idx = incTok.findIndex((w) => norm(w) === key);
             const correctForm = (aligned && idx !== -1) ? corTok[idx] : String(ew);
-            return { incorrect: key, correct: correctForm, type: classifyFixupError(ew, correctForm) };
+            return {
+              word_index: idx,
+              incorrect: key,
+              correct: correctForm,
+              type: classifyFixupError(ew, correctForm)
+            };
           });
           return { incorrect_sentence: incorrect, errors, correct_sentence: correct, input_type: 'type' };
         })
@@ -858,10 +1002,9 @@
         passage: {
           title: r.title || '',
           text: r.passageText || '',
-          // Full-text read-aloud (optional). Pages authored before this field
-          // existed simply have no passageAudioName → no speaker button.
+          // Full-text read-aloud (optional). Pages without passageAudio → no speaker button.
           // The `passage:` prefix is the resolver hint (see resolveAudioUrl).
-          audio: t.passageAudioName ? 'passage:' + t.passageAudioName + '.mp3' : null,
+          audio: r.passageAudio ? 'passage:' + r.passageAudio + '.mp3' : null,
           image: Array.isArray(r.imageGroup) && r.imageGroup[0]
             ? r.imageGroup[0] + '.webp'
             : null,
@@ -870,7 +1013,7 @@
             : []
         },
         questions: (t.questions || []).map((q) => {
-          const isChoice = q.answerMode === 'choice';
+          const isChoice = q.answerMode === 'choice' || q.answerMode === 'multiple_choice';
           const opts = isChoice && Array.isArray(q.options)
             ? q.options.map((o) => ({ text: String(o), correct: String(o) === String(q.answer) }))
             : null;
@@ -884,6 +1027,24 @@
         })
       }
     };
+  }
+
+  function slugifySentenceAudio(text) {
+    let value = String(text || '')
+      .replace(/[\u2018\u2019]/g, "'")
+      .replace(/[\u201C\u201D]/g, '"')
+      .replace(/[\u2013\u2014]/g, ' ')
+      .trim();
+    const terminal = value.replace(/"+$/, '');
+    let suffix = '';
+    if (terminal.endsWith('!')) suffix = '!';
+    else if (terminal.endsWith('?')) suffix = '_q';
+    value = value
+      .toLowerCase()
+      .replace(/[.,?!"'()]/g, '')
+      .replace(/\s+/g, '_')
+      .replace(/^_+|_+$/g, '');
+    return value + suffix;
   }
 
   function translateCircleSentence(topics, ctx) {
@@ -905,11 +1066,13 @@
         instruction: ctx.instructionText,
         instruction_audio: ctx.instructionAudio,
         select_mode: 'multi',
+        criterion: t.mainIdea || '',
         target_word: t.mainIdea || '',
         options: t.sentences.map((s, i) => ({
           content: s,
           type: 'sentence',
-          correct: correct.has(i)
+          correct: correct.has(i),
+          audio: 'sentence:' + slugifySentenceAudio(s) + '.mp3'
         }))
       }
     };
@@ -1184,6 +1347,9 @@
     english_initial_sound_spelling:
       () => ({ templateId: 'T-SPELL', variantNumber: 1, variantName: 'Initial Sound Spelling (4 Cells)' }),
     english_circle_picture: (topics) => {
+      if (topics[0] && topics[0].targetRime) {
+        return { templateId: 'T-CIRCLE', variantNumber: 5, variantName: 'Circle Picture by Rhyme (4 Cards, Single-Select)' };
+      }
       const multi = ((topics[0] && topics[0].correctWords && topics[0].correctWords.length) || 0) > 1;
       return multi
         ? { templateId: 'T-CIRCLE', variantNumber: 2, variantName: 'Circle Pictures by Digraph (4 Cards, Multi-Select)' }
@@ -1224,22 +1390,40 @@
       () => ({ templateId: 'T-BLEND', variantNumber: 2, variantName: 'Phoneme Blend - Picture Support (2 Rows)' }),
     english_word_bank_cloze:
       () => ({ templateId: 'T-FILLIN', variantNumber: 1, variantName: 'Word Bank Cloze (2 Rows)' }),
-    english_find_word:
-      () => ({ templateId: 'T-FINDWORD', variantNumber: null, variantName: 'Find Words in Grid' }),
-    english_circle_word:
-      () => ({ templateId: 'T-CIRCLE', variantNumber: 3, variantName: 'Circle the Word (6 or 8 Cards, Multi-Select)' }),
+    english_find_word: (topics) => {
+      const silent = topics[0] && topics[0].cardAudioMode === 'silent';
+      return silent
+        ? { templateId: 'T-FINDWORD', variantNumber: 4, variantName: 'Find Words in 4×4 Grid (3 Words, Silent Word Bank, ≤4 Letters)' }
+        : { templateId: 'T-FINDWORD', variantNumber: null, variantName: 'Find Words in Grid' };
+    },
+    english_circle_word: (topics) => {
+      const silent = topics[0] && topics[0].cardAudioMode === 'silent';
+      return silent
+        ? { templateId: 'T-CIRCLE', variantNumber: 6, variantName: 'Circle the Word (6 or 8 Silent Cards, Multi-Select)' }
+        : { templateId: 'T-CIRCLE', variantNumber: 3, variantName: 'Circle the Word (6 or 8 Cards, Multi-Select)' };
+    },
     english_circle_picture_rhyme:
       () => ({ templateId: 'T-CIRCLE', variantNumber: 5, variantName: 'Circle Picture by Rhyme (4 Cards, Single-Select)' }),
     english_sort_words: (topics) => {
       const display = topics[0] && topics[0].cardDisplay;
+      const silent = topics[0] && topics[0].cardAudioMode === 'silent';
+      if (display === 'pictureWord') {
+        return { templateId: 'T-SORT', variantNumber: 1, variantName: 'Sort Picture Words (2 Buckets, 6 Cards)' };
+      }
+      if (display === 'word' && silent) {
+        return { templateId: 'T-SORT', variantNumber: 5, variantName: 'Sort Words (2 Buckets, 6 Silent Cards)' };
+      }
       return display === 'letter'
         ? { templateId: 'T-SORT', variantNumber: 2, variantName: 'Sort Words (2 Buckets, Letter Case)' }
         : { templateId: 'T-SORT', variantNumber: 2, variantName: 'Sort Words (2 Buckets, 6 Cards)' };
     },
     english_sequence: (topics) => {
       const display = topics[0] && topics[0].cardDisplay;
-      return display === 'letter'
-        ? { templateId: 'T-SEQUENCE', variantNumber: 2, variantName: 'ABC Order Sequencing (4 Cards, 4 Slots)' }
+      if (display === 'letter') {
+        return { templateId: 'T-SEQUENCE', variantNumber: 2, variantName: 'ABC Order Sequencing (4 Cards, 4 Slots)' };
+      }
+      return display === 'sentence'
+        ? { templateId: 'T-SEQUENCE', variantNumber: 1, variantName: 'Story Event Sequencing (4 Cards, 4 Slots)' }
         : { templateId: 'T-SEQUENCE', variantNumber: 1, variantName: 'Story Pictures in Order (4 Cards, 4 Slots)' };
     },
     english_trace_letter: (topics) => {
@@ -1292,7 +1476,7 @@
         : { templateId: 'T-PASSAGE', variantNumber: 1, variantName: 'Reading Comprehension - Multiple Choice (3 Questions)' };
     },
     english_circle_sentence:
-      () => ({ templateId: 'T-CIRCLE', variantNumber: 4, variantName: 'Circle Sentences by Main Idea (6 Cards, Multi-Select)' }),
+      () => ({ templateId: 'T-CIRCLE', variantNumber: 4, variantName: 'Circle Sentences by Main Idea (5 Cards, Multi-Select)' }),
     english_sentence_word_bank:
       () => ({ templateId: 'T-SENTENCE', variantNumber: 1, variantName: 'Sentence with Word Bank (x2, 1 Sentence per Item)' }),
     english_picture_sentence:
@@ -1407,12 +1591,25 @@
     const type = types[0];
     const templateMeta = resolveTemplateMeta(type, topics);
 
+    if (type === 'english_circle_picture' && topics[0].targetRime) {
+      try {
+        const result = translateCirclePictureRhyme(topics, ctx);
+        result.ctx = ctx;
+        result.templateMeta = templateMeta;
+        return result;
+      } catch (e) {
+        console.error('[bitable] translator error', e);
+        return { kind: 'error', reason: e.message, ctx, rawPage: page, templateMeta };
+      }
+    }
+
     if (type === 'english_circle_picture') {
       return {
         kind: 'circle_multi',
         ctx, templateMeta,
         rows: topics.map((t) => ({
           options: (t.options || []).slice(),
+          imageKeys: (t.options || []).map((word) => wordImageKey(t, word)),
           correct: t.correctWords || (t.correctAnswer ? [t.correctAnswer] : []),
           sourceTraceMap: t.source_trace_map || {}
         }))
@@ -1527,7 +1724,8 @@
         card.id = 'bt-circle-' + rowIdx + '-' + optIdx;
         card.dataset.correct = String(isCorrect);
 
-        const img = R.imagePlaceholder(word + '.webp', 96, 72);
+        const imageKey = (row.imageKeys || [])[optIdx] || word;
+        const img = R.imagePlaceholder(imageKey + '.webp', 96, 72);
         card.appendChild(img);
 
         const label = document.createElement('span');
@@ -1570,13 +1768,16 @@
 
   function attachSourceTraces(container, translated) {
     if (!translated.sourceTraces) return;
-    let nodes;
     if (translated.templateId === 'T-MATCH') {
-      nodes = container.querySelectorAll('[data-field^="pairs["][data-field$=".left"]');
-    } else {
-      // T-SOUNDBOX / T-WRITE: items wrapped in .ws-item-row with data-field="items[N]"
-      nodes = container.querySelectorAll('[data-field^="items["]:not([data-field*="."])');
+      translated.sourceTraces.forEach((trace, i) => {
+        if (!trace) return;
+        const node = container.querySelector('[data-field="pairs[' + i + '].left"]');
+        if (node) node.setAttribute('data-source-trace', trace);
+      });
+      return;
     }
+    // T-SOUNDBOX / T-WRITE: items wrapped in .ws-item-row with data-field="items[N]"
+    const nodes = container.querySelectorAll('[data-field^="items["]:not([data-field*="."])');
     translated.sourceTraces.forEach((trace, i) => {
       if (trace && nodes[i]) nodes[i].setAttribute('data-source-trace', trace);
     });

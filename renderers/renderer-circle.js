@@ -8,6 +8,45 @@ window.JOJO_RENDERERS['T-CIRCLE'] = function (data, container) {
   R.annotate(inst, 'instruction');
   container.appendChild(inst);
 
+  // v5 target rime: the page carries a real `rime` resource (the extractor emits
+  // {type:'rime'} for it), so it belongs on the page — but an unlabelled speaker
+  // floating above the grid reads as a rendering glitch. Name what it plays.
+  if (data.variant === 'v5' && data.target_rime_audio) {
+    var targetAudio = document.createElement('div');
+    targetAudio.className = 'ws-circle-target-audio';
+    targetAudio.appendChild(R.audioButton(data.target_rime_audio));
+
+    var targetLabel = document.createElement('span');
+    targetLabel.className = 'ws-circle-target-audio-label';
+    targetLabel.textContent = data.target_rime
+      ? 'Target rime: ' + data.target_rime
+      : 'Target rime';
+    targetAudio.appendChild(targetLabel);
+
+    R.annotate(targetAudio, 'target_rime_audio');
+    container.appendChild(targetAudio);
+  }
+
+  // Main-idea criterion (english_circle_sentence). It stays separate from the
+  // child-facing instruction so the worksheet preserves the spec's top area.
+  if (data.criterion) {
+    var criterion = document.createElement('div');
+    criterion.className = 'ws-circle-criterion';
+
+    var criterionLabel = document.createElement('span');
+    criterionLabel.className = 'ws-circle-criterion-label';
+    criterionLabel.textContent = 'Main idea';
+    criterion.appendChild(criterionLabel);
+
+    var criterionText = document.createElement('span');
+    criterionText.className = 'ws-circle-criterion-text';
+    criterionText.textContent = data.criterion;
+    criterion.appendChild(criterionText);
+
+    R.annotate(criterion, 'criterion');
+    container.appendChild(criterion);
+  }
+
   // v4: paragraph mode — circle words within text
   if (data.variant === 'v4' && data.paragraph) {
     renderParagraphMode(data, container, R);
@@ -50,19 +89,20 @@ window.JOJO_RENDERERS['T-CIRCLE'] = function (data, container) {
         card.appendChild(label);
       }
 
-      if (opt.audio) {
-        var audioBtn = R.audioButton(opt.audio);
-        audioBtn.style.position = 'absolute';
-        audioBtn.style.top = '4px';
-        audioBtn.style.left = '4px';
-        card.style.position = 'relative';
-        card.appendChild(audioBtn);
-      }
     } else {
       var text = document.createElement('span');
       text.className = 'ws-option-card-text';
       text.textContent = opt.content;
       card.appendChild(text);
+    }
+
+    if (opt.audio) {
+      var audioBtn = R.audioButton(opt.audio);
+      audioBtn.style.position = 'absolute';
+      audioBtn.style.top = '4px';
+      audioBtn.style.left = '4px';
+      card.style.position = 'relative';
+      card.appendChild(audioBtn);
     }
 
     card.id = 'circle-opt-' + i;
@@ -74,12 +114,9 @@ window.JOJO_RENDERERS['T-CIRCLE'] = function (data, container) {
   grid.appendChild(gridArea);
   container.appendChild(grid);
 
-  // Draw hand-drawn circles on correct answers after layout
-  requestAnimationFrame(function () {
-    var svg = R.svgOverlay();
-    gridArea.appendChild(svg);
-    var gridRect = gridArea.getBoundingClientRect();
-
+  // Hand-drawn circles on the correct answers. Cards are grid `1fr`, so they
+  // move and resize with the container — svgOverlayIn redraws on every relayout.
+  R.svgOverlayIn(gridArea, function (svg, gridRect) {
     options.forEach(function (opt, i) {
       if (!opt.correct) return;
       var el = document.getElementById('circle-opt-' + i);
@@ -115,11 +152,9 @@ function renderParagraphMode(data, container, R) {
   R.annotate(para, 'paragraph');
   container.appendChild(para);
 
-  requestAnimationFrame(function () {
-    var svg = R.svgOverlay();
-    para.appendChild(svg);
-    var paraRect = para.getBoundingClientRect();
-
+  // Text reflows to different line counts when the column width changes, so the
+  // circles must be re-measured, not scaled.
+  R.svgOverlayIn(para, function (svg, paraRect) {
     var targetEls = para.querySelectorAll('.ws-target-word');
     targetEls.forEach(function (el, i) {
       var rect = el.getBoundingClientRect();

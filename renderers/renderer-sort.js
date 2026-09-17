@@ -26,12 +26,23 @@ window.JOJO_RENDERERS['T-SORT'] = function (data, container) {
     if (card.type === 'image') {
       cardEl.classList.add('ws-card-image');
       cardEl.appendChild(R.imagePlaceholder(card.content, 60, 50));
+      if (card.label) {
+        var imageLabel = document.createElement('span');
+        imageLabel.textContent = card.label;
+        cardEl.appendChild(imageLabel);
+      }
     } else {
       var text = document.createElement('span');
       text.style.fontFamily = '"Andika", "Comic Neue", sans-serif';
       text.style.fontSize = card.type === 'sentence' ? '14px' : '18px';
       text.textContent = card.content;
       cardEl.appendChild(text);
+    }
+
+    if (card.audio) {
+      var audioBtn = R.audioButton(card.audio);
+      R.annotate(audioBtn, 'cards[' + i + '].audio');
+      cardEl.appendChild(audioBtn);
     }
 
     R.annotate(cardEl, 'cards[' + i + ']');
@@ -72,7 +83,7 @@ window.JOJO_RENDERERS['T-SORT'] = function (data, container) {
       mini.style.marginBottom = '4px';
       mini.style.color = 'var(--text-primary)';
       mini.style.textAlign = 'center';
-      mini.textContent = card.content;
+      mini.textContent = card.label || card.content;
       bucketEl.appendChild(mini);
     });
 

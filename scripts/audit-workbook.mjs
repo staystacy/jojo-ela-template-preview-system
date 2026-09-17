@@ -79,6 +79,13 @@ function resolveImage(word, M) {
   return false;
 }
 
+function wordImageKey(topic, word) {
+  const overrides = topic && Array.isArray(topic.wordImageOverrides)
+    ? topic.wordImageOverrides : [];
+  const hit = overrides.find((entry) => entry && entry.word === word);
+  return hit && hit.imageKey ? String(hit.imageKey) : String(word);
+}
+
 // ---------- Per-topicType expectation extractor ----------
 // For each topic, return:
 //   { templateId, expectations: [{ slot, label, audioName, expectCategory }],
@@ -93,27 +100,29 @@ function resolveImage(word, M) {
 const EXTRACTORS = {
   english_trace_letter(t) {
     if (!t.letter) return { issues: [{ kind: 'translator_error', msg: 'missing letter' }] };
-    const letter = t.letter;
-    // T-TRACE demo plays `<letter.toLowerCase()>.mp3` → resolver tries
-    // phoneme/word/rime/instruction/letter in order. For "a" → no phoneme/word/rime/instr
-    // named "a", falls to letter A → letter-name audio.
+    // The demo speaker on Letter Tracing plays the WORD, not the letter.
     return {
       templateId: 'T-TRACE',
-      expectations: [
-        { slot: 'demo.audio', label: letter, audioName: letter.toLowerCase(), expectCategory: 'letter' }
-      ],
+      expectations: t.word
+        ? [{ slot: 'demo.audio', label: t.word, audioName: t.word, expectCategory: 'word' }]
+        : [],
       images: t.word ? [{ slot: 'demo.image', word: t.word }] : []
     };
   },
 
   english_shadow_writing(t) {
     if (!t.letter) return { issues: [{ kind: 'translator_error', msg: 'missing letter' }] };
+    // Demo speaker plays the letter; every wordList entry renders as a word card
+    // with its own picture + word audio.
+    const words = (t.wordList || []).filter(Boolean);
     return {
       templateId: 'T-TRACE',
       expectations: [
-        { slot: 'demo.audio', label: t.letter, audioName: t.letter.toLowerCase(), expectCategory: 'letter' }
-      ],
-      images: []
+        { slot: 'demo.audio', label: t.letter, audioName: t.letter[0].toLowerCase(), expectCategory: 'letter' }
+      ].concat(words.map((w, i) => (
+        { slot: `wordCard[${i}].audio`, label: w, audioName: w, expectCategory: 'word' }
+      ))),
+      images: words.map((w, i) => ({ slot: `wordCard[${i}].image`, word: w }))
     };
   },
 
@@ -178,7 +187,7 @@ const EXTRACTORS = {
     const imgs = [];
     opts.forEach((w, i) => {
       exp.push({ slot: `option[${i}].audio`, label: w, audioName: w, expectCategory: 'word' });
-      imgs.push({ slot: `option[${i}].image`, word: w });
+      imgs.push({ slot: `option[${i}].image`, word: wordImageKey(t, w) });
     });
     return { templateId: 'T-CIRCLE', expectations: exp, images: imgs };
   },
@@ -201,7 +210,6 @@ const EXTRACTORS = {
     const topMap = Object.fromEntries(t.topItems.map((x) => [x.id, x.value]));
     const botMap = Object.fromEntries(t.bottomItems.map((x) => [x.id, x.value]));
     const matchType = t.matchType || 'picture_to_word';
-    const leftIsImage = matchType === 'picture_to_word';
     const exp = [];
     const imgs = [];
     const issues = [];
@@ -213,9 +221,12 @@ const EXTRACTORS = {
         issues.push({ kind: 'translator_error', msg: `pair[${i}] references missing id ${pairStr}` });
         return;
       }
-      if (leftIsImage) {
-        imgs.push({ slot: `pair[${i}].left.image`, word: leftValue });
+      if (matchType === 'picture_to_word') {
         exp.push({ slot: `pair[${i}].left.audio`, label: leftValue, audioName: leftValue, expectCategory: 'word' });
+        imgs.push({
+          slot: `pair[${i}].right.image`,
+          word: wordImageKey(t, rightValue)
+        });
       } else {
         // letter case / synonyms / antonyms / sound_to_word — left renders as word/letter card with audio
         exp.push({ slot: `pair[${i}].left.audio`, label: leftValue, audioName: leftValue, expectCategory: leftValue.length === 1 ? 'letter' : 'word' });
@@ -231,8 +242,8 @@ const EXTRACTORS = {
     t.rows.forEach((r, i) => {
       const onsetAudio = r.onset_phoneme_id || r.onset;
       const rimeAudio  = r.rime_id || r.rime;
-      exp.push({ slot: `row[${i}].onset`, label: '/' + r.onset + '/', audioName: onsetAudio, expectCategory: 'phoneme' });
-      exp.push({ slot: `row[${i}].rime`,  label: '/' + r.rime  + '/', audioName: rimeAudio,  expectCategory: 'rime' });
+      exp.push({ slot: `row[${i}].onset`, label: r.onset, audioName: onsetAudio, expectCategory: 'phoneme' });
+      exp.push({ slot: `row[${i}].rime`,  label: r.rime,  audioName: rimeAudio,  expectCategory: 'rime' });
       if (r.imageName || r.word) imgs.push({ slot: `row[${i}].image`, word: r.imageName || r.word });
     });
     return { templateId: 'T-BLEND', expectations: exp, images: imgs };
@@ -263,18 +274,51 @@ const EXTRACTORS = {
   },
 
   english_find_word(t) {
-    return { templateId: 'T-FINDWORD', expectations: [], images: [] };
+    const expectations = (t.words || []).map((word, i) => ({
+      slot: `target_word[${i}].audio`,
+      label: word,
+      audioName: word,
+      expectCategory: 'word'
+    }));
+    return { templateId: 'T-FINDWORD', expectations, images: [] };
   },
 
   english_circle_word(t) {
-    // T-CIRCLE renderer only emits audio when opt.audio is set, and
-    // translateCircleWord() does NOT set opt.audio — cards are silent.
-    return { templateId: 'T-CIRCLE', expectations: [], images: [] };
+    const target = String(t.targetWord || '').trim();
+    const isLetter = /^[A-Za-z]$/.test(target);
+    const expectations = (t.options || []).map((value, i) => ({
+      slot: `option[${i}].audio`,
+      label: value,
+      audioName: value,
+      expectCategory: isLetter ? 'letter' : 'word'
+    }));
+    return { templateId: 'T-CIRCLE', expectations, images: [] };
   },
 
   english_sort_words(t) {
-    // renderer-sort.js does not emit audio buttons.
-    return { templateId: 'T-SORT', expectations: [], images: [] };
+    const expectations = [];
+    const images = [];
+    const isPictureWord = t.cardDisplay === 'pictureWord';
+    const isSilentLetter = t.cardDisplay === 'letter';
+    (t.cardGroups || []).forEach((group, gi) => {
+      (group.cards || []).forEach((word, ci) => {
+        if (!isSilentLetter) {
+          expectations.push({
+            slot: `group[${gi}].card[${ci}].audio`,
+            label: word,
+            audioName: word,
+            expectCategory: 'word'
+          });
+        }
+        if (isPictureWord) {
+          images.push({
+            slot: `group[${gi}].card[${ci}].image`,
+            word: wordImageKey(t, word)
+          });
+        }
+      });
+    });
+    return { templateId: 'T-SORT', expectations, images };
   },
 
   english_sequence(t) {
@@ -334,22 +378,22 @@ const EXTRACTORS = {
   },
 
   english_ladder(t) {
-    // v2605.25 production translator: flat structure (one topic = one ladder).
-    // T-LADDER renderer emits NO audio buttons for rungs (only the page
-    // instruction button). Each rung gets an image placeholder only when
-    // rung.word is truthy.
-    //
-    // Per spec ELA-Template-json-260525.html#ladder-2-partial-picture-support:
-    // Partial Picture Support variant intentionally has ONE blank rung per
-    // ladder (word + targetText both empty string by design). Kids guess the
-    // first letter using the rime word bank. Skip empty rungs silently —
-    // they're a feature, not a data gap.
+    // Non-empty rungs use the spec's picture + Word Audio card. Partial
+    // Picture Support intentionally leaves one empty, silent rung per ladder.
     const rungs = Array.isArray(t.rungs) ? t.rungs : [];
+    const expectations = [];
     const images = [];
     rungs.forEach((r, i) => {
-      if (r.word) images.push({ slot: `rung[${i}].image`, word: r.word });
+      if (!r.word) return;
+      expectations.push({
+        slot: `rung[${i}].audio`,
+        label: r.word,
+        audioName: r.word,
+        expectCategory: 'word'
+      });
+      images.push({ slot: `rung[${i}].image`, word: r.word });
     });
-    return { templateId: 'T-LADDER', expectations: [], images };
+    return { templateId: 'T-LADDER', expectations, images };
   },
 
   english_sound_box_digraph_partial_fill(t) {
