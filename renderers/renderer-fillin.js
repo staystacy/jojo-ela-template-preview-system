@@ -44,6 +44,19 @@ window.JOJO_RENDERERS['T-FILLIN'] = function (data, container) {
       row.appendChild(R.audioButton(item.audio));
     }
 
+    // Optional learner cue, such as "comparing two" or "the most".
+    if (item.hint) {
+      var hint = document.createElement('span');
+      hint.style.fontFamily = '"Andika", "Comic Neue", sans-serif';
+      hint.style.fontSize = '11px';
+      hint.style.fontWeight = '600';
+      hint.style.color = 'var(--jojo-teal)';
+      hint.style.whiteSpace = 'nowrap';
+      hint.textContent = item.hint;
+      R.annotate(hint, 'items[' + i + '].hint');
+      row.appendChild(hint);
+    }
+
     // Display text with inline blank cells
     var displayWrap = document.createElement('div');
     displayWrap.style.display = 'flex';

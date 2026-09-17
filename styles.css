@@ -380,6 +380,32 @@ html, body {
   line-height: 1.5;
 }
 
+.ws-circle-criterion {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 10px 14px;
+  margin: -8px 0 18px;
+  background: var(--demo-bg);
+  border-left: 4px solid var(--jojo-teal);
+  border-radius: 8px;
+}
+
+.ws-circle-criterion-label {
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.ws-circle-criterion-text {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
 /* Demo area */
 .ws-demo {
   background: var(--demo-bg);
@@ -1377,4 +1403,115 @@ html, body {
   border-radius: 3px;
   font-family: "Fira Code", monospace;
   font-size: 12px;
+}
+
+/* T-CIRCLE v5 target rime player — a labelled chip, so the speaker above the
+   card grid reads as "this is the rime to listen for" and not as a stray icon. */
+.ws-circle-target-audio {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 12px;
+  padding: 6px 12px 6px 8px;
+  background: var(--card-bg);
+  border: 2px solid var(--card-border);
+  border-radius: 999px;
+}
+.ws-circle-target-audio-label {
+  font-family: "Andika", "Comic Neue", sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+/* ========== T-TRACE ruled handwriting cards (letter variants 1-7) ========== */
+/* Colours sampled from the Figma frames trace-01..07. */
+.ws-ruled-cell {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.ws-ruled-cell-bg {
+  fill: #FFFFFF;
+  stroke: #D8D8D0;
+  stroke-width: 1;
+}
+
+.ws-rule-line-blue { stroke: #BEDBFF; stroke-width: 1.1; }
+.ws-rule-line-red  { stroke: #FFA2A2; stroke-width: 1.1; }
+
+.ws-ruled-glyph {
+  font-family: "Andika", "Comic Neue", sans-serif;
+}
+
+.ws-ruled-glyph.is-guide { fill: #D8D8D0; }
+.ws-ruled-glyph.is-model { fill: #4A90E2; }
+
+.ws-ruled-cell-box {
+  width: 100%;
+}
+
+.ws-trace-letter-grid {
+  flex: 1;
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  justify-content: start;
+}
+
+/* Demo column: plain white with the Figma dashed divider, top-aligned */
+.ws-layout-a .ws-demo-panel.is-plain {
+  background: transparent;
+  border-radius: 0;
+  border-right: 2px dashed #C4DFF3;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 4px 20px 4px 4px;
+  width: 190px;
+  min-width: 190px;
+}
+
+.ws-trace-word-label {
+  font-family: "Andika", "Comic Neue", sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.ws-trace-word-label.is-large {
+  font-size: 22px;
+}
+
+.ws-trace-word-card {
+  position: relative;
+  width: 100%;
+  border-radius: 14px;
+  padding: 10px 10px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.ws-trace-word-card.tone-blue  { background: #E7F3F6; border: 2px solid #88D6E7; }
+.ws-trace-word-card.tone-amber { background: #FFF2DB; border: 2px solid #F5DFB8; }
+
+.ws-trace-word-card-audio {
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  width: 26px;
+  height: 26px;
+}
+
+.ws-trace-word-label-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ws-trace-word-label-audio {
+  width: 26px;
+  height: 26px;
 }

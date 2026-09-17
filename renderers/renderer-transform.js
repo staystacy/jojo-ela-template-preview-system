@@ -21,7 +21,7 @@ window.JOJO_RENDERERS['T-TRANSFORM'] = function (data, container) {
   var grid = document.createElement('div');
   grid.style.display = 'grid';
   grid.style.gap = '14px';
-  grid.style.gridTemplateColumns = isSentenceMode ? '1fr' : 'repeat(2, 1fr)';
+  grid.style.gridTemplateColumns = isSentenceMode ? '1fr' : 'repeat(2, minmax(0, 1fr))';
 
   items.forEach(function (item, i) {
     if (isPictureMode) {
@@ -113,6 +113,7 @@ function renderPictureCell(R, item, i, cellSize) {
 function renderTextRow(R, item, i, cellSize, isSentenceMode) {
   var row = R.itemRow();
   row.style.flexWrap = 'nowrap';
+  row.style.minWidth = '0';
 
   row.appendChild(R.itemNumber(i + 1));
 
@@ -138,9 +139,12 @@ function renderTextRow(R, item, i, cellSize, isSentenceMode) {
 
   if (item.rule) {
     var rule = document.createElement('span');
-    rule.style.fontSize = '10px';
-    rule.style.color = 'var(--text-hint)';
+    rule.style.fontSize = '12px';
+    rule.style.fontWeight = '700';
+    rule.style.color = 'var(--jojo-teal)';
     rule.style.fontFamily = '"Fira Code", monospace';
+    rule.style.whiteSpace = 'nowrap';
+    rule.style.flexShrink = '0';
     rule.textContent = item.rule;
     row.appendChild(rule);
   }
@@ -156,9 +160,14 @@ function renderTextRow(R, item, i, cellSize, isSentenceMode) {
   } else {
     var cellGroup = document.createElement('div');
     cellGroup.className = 'ws-soundbox-group';
+    cellGroup.style.minWidth = '0';
+    cellGroup.style.flexShrink = '1';
     var answer = item.answer || '';
     answer.split('').forEach(function (ch) {
-      cellGroup.appendChild(R.writingCell(cellSize, 'answer', ch));
+      var cell = R.writingCell(cellSize, 'answer', ch);
+      cell.style.minWidth = '0';
+      cell.style.flexShrink = '1';
+      cellGroup.appendChild(cell);
     });
     row.appendChild(cellGroup);
   }
