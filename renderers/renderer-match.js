@@ -35,20 +35,14 @@ window.JOJO_RENDERERS['T-MATCH'] = function (data, container) {
   rightCol.style.justifyContent = 'space-around';
   rightCol.style.gap = '20px';
 
-  // Right column order comes from the page itself whenever the caller supplies
-  // it, so the preview reproduces the Page JSON instead of a reshuffle of it.
-  // Mock data in data-match.js carries no order, so it keeps the fixed-seed
-  // shuffle that made those demo pages look matched-up.
-  var rightOrder = data.right_order;
-  if (!Array.isArray(rightOrder) || rightOrder.length !== pairs.length) {
-    rightOrder = pairs.map(function (_, i) { return i; });
-    var rng = R.seededRandom(42);
-    for (var i = rightOrder.length - 1; i > 0; i--) {
-      var j = Math.floor(rng() * (i + 1));
-      var temp = rightOrder[i];
-      rightOrder[i] = rightOrder[j];
-      rightOrder[j] = temp;
-    }
+  // Shuffle right side for display
+  var rightOrder = pairs.map(function (_, i) { return i; });
+  var rng = R.seededRandom(42);
+  for (var i = rightOrder.length - 1; i > 0; i--) {
+    var j = Math.floor(rng() * (i + 1));
+    var temp = rightOrder[i];
+    rightOrder[i] = rightOrder[j];
+    rightOrder[j] = temp;
   }
 
   pairs.forEach(function (pair, i) {
